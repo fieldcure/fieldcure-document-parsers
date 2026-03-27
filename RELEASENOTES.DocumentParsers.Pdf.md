@@ -1,5 +1,15 @@
 # Release Notes — FieldCure.DocumentParsers.Pdf
 
+## [0.2.0] - 2026-03-27
+
+### Added
+- Unit test project (`DocumentParsers.Pdf.Tests`) with 11 tests covering text extraction, page headers, content ordering, and image rendering
+- Higher DPI rendering test (`ExtractImages_HigherDpiProducesLargerImage`)
+
+### Changed
+- Migrated to independent repository (fieldcure/fieldcure-document-parsers)
+- `RepositoryUrl` updated to `https://github.com/fieldcure/fieldcure-document-parsers`
+
 ## [0.1.0] - 2026-03-25
 
 ### Added

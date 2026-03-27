@@ -1,5 +1,20 @@
 # Release Notes — FieldCure.DocumentParsers
 
+## [0.3.0] - 2026-03-27
+
+### Added
+- `HancomMathNormalizer` — Hancom equation script → LaTeX structural conversion (ported from hml-equation-parser architecture)
+- `OoxmlMathConverter` — OOXML Math (`m:oMath`) → LaTeX structural conversion for DOCX/PPTX
+- Math equation output in `[math: LaTeX]` format for LLM / RAG consumption
+- `HwpxParser` now extracts `<hp:equation>` blocks as `[math: ...]` lines
+- `DocxParser` now extracts `m:oMath` elements as inline or block `[math: ...]`
+- Support for `\frac`, `\sum`, `\int`, `\left`/`\right`, `\widehat` and other LaTeX structures
+- Greek and special characters preserved as Unicode (γ, λ, τ, ∞) for direct RAG search hits
+
+### Changed
+- `src/DocumentParsers/` reorganized into `Ooxml/` and `Hwpx/` subfolders
+- Migrated to independent repository (fieldcure/fieldcure-document-parsers)
+
 ## [0.2.0] - 2026-03-25
 
 ### Added

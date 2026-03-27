@@ -3,7 +3,7 @@
 **PDF text extraction and page image rendering** — an extension package for [FieldCure.DocumentParsers](https://www.nuget.org/packages/FieldCure.DocumentParsers).
 
 [![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Pdf)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/fieldcure/fieldcure-assiststudio/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/fieldcure/fieldcure-document-parsers/blob/main/LICENSE)
 
 ## Features
 
@@ -51,4 +51,4 @@ foreach (var img in images)
 
 ## License
 
-[MIT](https://github.com/fieldcure/fieldcure-assiststudio/blob/main/LICENSE) — Copyright (c) 2026 FieldCure Co., Ltd.
+[MIT](https://github.com/fieldcure/fieldcure-document-parsers/blob/main/LICENSE) — Copyright (c) 2026 FieldCure Co., Ltd.

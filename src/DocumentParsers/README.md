@@ -3,7 +3,7 @@
 **Lightweight document text extraction for .NET** — DOCX, HWPX, XLSX, PPTX, and more. Tables are converted to markdown for LLM / RAG consumption.
 
 [![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers)](https://www.nuget.org/packages/FieldCure.DocumentParsers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/fieldcure/fieldcure-assiststudio/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/fieldcure/fieldcure-document-parsers/blob/main/LICENSE)
 
 ## Features
 
@@ -11,6 +11,7 @@
 - **HWPX** — Korean standard format (KS X 6101 / OWPML). Paragraphs, tables, multi-section support
 - **XLSX** — Spreadsheet sheets as markdown tables with SharedString resolution
 - **PPTX** — Slide text, tables, and speaker notes extraction
+- **Math equations** — DOCX (`m:oMath`) and HWPX (`hp:equation`) equations converted to `[math: LaTeX]` blocks
 - **Markdown tables** — All document tables are converted to markdown with pipe escaping
 - **Factory pattern** — `DocumentParserFactory.GetParser(".docx")` returns the right parser
 - **Zero platform dependency** — Targets `net8.0`, no Windows-specific APIs
@@ -85,4 +86,4 @@ See [FieldCure.DocumentParsers.Pdf](https://www.nuget.org/packages/FieldCure.Doc
 
 ## License
 
-[MIT](https://github.com/fieldcure/fieldcure-assiststudio/blob/main/LICENSE) — Copyright (c) 2026 FieldCure Co., Ltd.
+[MIT](https://github.com/fieldcure/fieldcure-document-parsers/blob/main/LICENSE) — Copyright (c) 2026 FieldCure Co., Ltd.
