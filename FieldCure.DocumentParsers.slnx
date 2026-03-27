@@ -1,0 +1,22 @@
+<Solution>
+
+  <Configuration Solution="Debug|Any CPU" />
+  <Configuration Solution="Release|Any CPU" />
+
+  <Folder Name="/docs/">
+    <File Path="README.md" />
+    <File Path="RELEASENOTES.DocumentParsers.md" />
+    <File Path="RELEASENOTES.DocumentParsers.Pdf.md" />
+  </Folder>
+
+  <Folder Name="/src/">
+    <Project Path="src/DocumentParsers/DocumentParsers.csproj" />
+    <Project Path="src/DocumentParsers.Pdf/DocumentParsers.Pdf.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="src/DocumentParsers.Tests/DocumentParsers.Tests.csproj" />
+    <Project Path="src/DocumentParsers.Pdf.Tests/DocumentParsers.Pdf.Tests.csproj" />
+  </Folder>
+
+</Solution>
