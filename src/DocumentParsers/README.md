@@ -2,9 +2,6 @@
 
 **Lightweight document text extraction for .NET** — DOCX, HWPX, XLSX, PPTX, and more. Tables are converted to markdown for LLM / RAG consumption.
 
-[![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers)](https://www.nuget.org/packages/FieldCure.DocumentParsers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/fieldcure/fieldcure-document-parsers/blob/main/LICENSE)
-
 ## Features
 
 - **DOCX** — Paragraphs, tables (including nested tables), multi-run text via OpenXML SDK

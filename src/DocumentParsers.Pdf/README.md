@@ -2,9 +2,6 @@
 
 **PDF text extraction and page image rendering** — an extension package for [FieldCure.DocumentParsers](https://www.nuget.org/packages/FieldCure.DocumentParsers).
 
-[![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Pdf)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/fieldcure/fieldcure-document-parsers/blob/main/LICENSE)
-
 ## Features
 
 - **Text extraction** — Page-by-page text extraction via PdfPig with `## Page {n}` headers
