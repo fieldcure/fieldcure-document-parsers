@@ -1,17 +1,27 @@
 # Scripts — Maintainers Only
 
-## publish-nuget.ps1
+## Publish Scripts
+
+| Script | Packages |
+|--------|----------|
+| `publish-core.ps1` | `FieldCure.DocumentParsers` only |
+| `publish-pdf.ps1` | `FieldCure.DocumentParsers.Pdf` only |
+| `publish-nuget.ps1` | Both (Core + Pdf) |
 
 ```powershell
-.\scripts\publish-nuget.ps1 -NuGetApiKey <key>   # pack → sign → push
-.\scripts\publish-nuget.ps1 -SkipPush             # pack → sign only
-.\scripts\publish-nuget.ps1 -SkipSign -SkipPush   # pack only
+# Core only
+.\scripts\publish-core.ps1                      # pack → sign → push
+.\scripts\publish-core.ps1 -SkipPush            # pack → sign only
+
+# Pdf only
+.\scripts\publish-pdf.ps1                       # pack → sign → push
+
+# Both at once
+.\scripts\publish-nuget.ps1                     # pack → sign → push
+.\scripts\publish-nuget.ps1 -SkipSign -SkipPush # pack only (testing)
 ```
 
-| PackageId | Project |
-|---|---|
-| `FieldCure.DocumentParsers` | src/DocumentParsers |
-| `FieldCure.DocumentParsers.Pdf` | src/DocumentParsers.Pdf |
+All scripts accept `-SkipSign`, `-SkipPush`, and `-NuGetApiKey` parameters.
 
 ## Prerequisites
 
