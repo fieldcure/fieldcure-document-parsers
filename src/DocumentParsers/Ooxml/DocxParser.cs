@@ -7,9 +7,9 @@ using OoxmlMath = DocumentFormat.OpenXml.Math;
 namespace FieldCure.DocumentParsers;
 
 /// <summary>
-/// Extracts plain text from DOCX files using Open XML SDK.
-/// Paragraphs are extracted as plain text with math equations converted to LaTeX notation.
-/// Tables are converted to markdown format.
+/// Extracts structured Markdown from DOCX files using Open XML SDK.
+/// Headings are detected via paragraph style IDs and outline levels.
+/// Math equations are converted to LaTeX notation. Tables are converted to markdown pipe format.
 /// </summary>
 public sealed class DocxParser : IDocumentParser
 {
@@ -34,6 +34,9 @@ public sealed class DocxParser : IDocumentParser
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     if (sb.Length > 0) sb.AppendLine();
+                    var headingLevel = GetHeadingLevel(paragraph);
+                    if (headingLevel > 0)
+                        sb.Append(new string('#', headingLevel) + " ");
                     sb.Append(text);
                 }
             }
@@ -49,6 +52,30 @@ public sealed class DocxParser : IDocumentParser
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Determines the heading level (1-9) for a paragraph. Returns 0 for body text.
+    /// </summary>
+    private static int GetHeadingLevel(Paragraph paragraph)
+    {
+        var styleId = paragraph.ParagraphProperties?.ParagraphStyleId?.Val?.Value;
+        if (styleId is not null)
+        {
+            // "Heading1" ~ "Heading9" pattern
+            if (styleId.StartsWith("Heading", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(styleId.AsSpan("Heading".Length), out var level)
+                && level is >= 1 and <= 9)
+                return level;
+        }
+
+        // Fallback: OutlineLevel (0 = Heading 1, 8 = Heading 9)
+        var outlineLevel = paragraph.ParagraphProperties?
+            .GetFirstChild<OutlineLevel>()?.Val?.Value;
+        if (outlineLevel.HasValue && outlineLevel.Value <= 8)
+            return outlineLevel.Value + 1;
+
+        return 0;
     }
 
     /// <summary>

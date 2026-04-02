@@ -12,6 +12,7 @@
   <Folder Name="/src/">
     <Project Path="src/DocumentParsers/DocumentParsers.csproj" />
     <Project Path="src/DocumentParsers.Pdf/DocumentParsers.Pdf.csproj" />
+    <Project Path="src/DocumentParsers.Cli/DocumentParsers.Cli.csproj" />
   </Folder>
 
   <Folder Name="/tests/">

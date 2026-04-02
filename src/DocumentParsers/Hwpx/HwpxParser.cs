@@ -5,9 +5,9 @@ using System.Xml.Linq;
 namespace FieldCure.DocumentParsers;
 
 /// <summary>
-/// Extracts plain text from HWPX files (Korean standard document format, KS X 6101 / OWPML).
-/// HWPX is a ZIP archive containing XML sections. Text is extracted at paragraph level (hp:p),
-/// and tables (hp:tbl) are converted to markdown format for LLM comprehension.
+/// Extracts structured Markdown from HWPX files (Korean standard document format, KS X 6101 / OWPML).
+/// HWPX is a ZIP archive containing XML sections. Headings are detected via header.xml paraShape
+/// outline levels. Tables (hp:tbl) are converted to markdown pipe format.
 /// </summary>
 public sealed class HwpxParser : IDocumentParser
 {
@@ -19,6 +19,9 @@ public sealed class HwpxParser : IDocumentParser
     {
         using var stream = new MemoryStream(data);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+        // Parse header.xml to build heading level maps
+        var (paraPrHeadingMap, styleHeadingMap) = BuildHeadingMaps(archive);
 
         // Collect section entries sorted by name (section0.xml, section1.xml, ...)
         var sectionEntries = archive.Entries
@@ -41,13 +44,74 @@ public sealed class HwpxParser : IDocumentParser
                 .Where(e => e.Name.LocalName == "sec");
 
             foreach (var sec in sectionElements)
-                ProcessBlockElements(sec, sb);
+                ProcessBlockElements(sec, sb, paraPrHeadingMap, styleHeadingMap);
 
             if (!sectionElements.Any() && xdoc.Root is not null)
-                ProcessBlockElements(xdoc.Root, sb);
+                ProcessBlockElements(xdoc.Root, sb, paraPrHeadingMap, styleHeadingMap);
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Parses header.xml to build two mappings for heading level resolution:
+    /// paraPrHeadingMap (paraPr id → heading level) and styleHeadingMap (style id → heading level).
+    /// A paragraph's heading level is resolved by styleIDRef first (via style → paraPrIDRef chain),
+    /// then by direct paraPrIDRef fallback.
+    /// </summary>
+    private static (Dictionary<int, int> paraPrMap, Dictionary<int, int> styleMap) BuildHeadingMaps(ZipArchive archive)
+    {
+        var paraPrMap = new Dictionary<int, int>();
+        var styleMap = new Dictionary<int, int>();
+
+        var headerEntry = archive.Entries
+            .FirstOrDefault(e => e.FullName.Equals("Contents/header.xml", StringComparison.OrdinalIgnoreCase));
+        if (headerEntry is null) return (paraPrMap, styleMap);
+
+        using var entryStream = headerEntry.Open();
+        var xdoc = XDocument.Load(entryStream);
+
+        // Step 1: Build paraPr id → heading level map
+        var paraPrElements = xdoc.Descendants()
+            .Where(e => e.Name.LocalName == "paraPr");
+
+        foreach (var paraPr in paraPrElements)
+        {
+            var idAttr = paraPr.Attribute("id");
+            if (idAttr is null || !int.TryParse(idAttr.Value, out var id)) continue;
+
+            var heading = paraPr.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "heading");
+            if (heading is null) continue;
+
+            var type = heading.Attribute("type")?.Value;
+            if (!string.Equals(type, "OUTLINE", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var levelAttr = heading.Attribute("level");
+            var level = 0;
+            if (levelAttr is not null) int.TryParse(levelAttr.Value, out level);
+
+            if (level is >= 0 and <= 6)
+                paraPrMap[id] = level + 1;
+        }
+
+        // Step 2: Build style id → heading level map (style → paraPrIDRef → paraPr heading)
+        var styleElements = xdoc.Descendants()
+            .Where(e => e.Name.LocalName == "style");
+
+        foreach (var style in styleElements)
+        {
+            var idAttr = style.Attribute("id");
+            var paraPrIdRefAttr = style.Attribute("paraPrIDRef");
+            if (idAttr is null || paraPrIdRefAttr is null) continue;
+            if (!int.TryParse(idAttr.Value, out var styleId)) continue;
+            if (!int.TryParse(paraPrIdRefAttr.Value, out var paraPrIdRef)) continue;
+
+            if (paraPrMap.TryGetValue(paraPrIdRef, out var headingLevel))
+                styleMap[styleId] = headingLevel;
+        }
+
+        return (paraPrMap, styleMap);
     }
 
     /// <summary>
@@ -55,7 +119,9 @@ public sealed class HwpxParser : IDocumentParser
     /// In HWPX, tables (hp:tbl) are embedded inside paragraphs (hp:p > hp:run > hp:tbl),
     /// so paragraphs are checked for embedded tables as well.
     /// </summary>
-    private static void ProcessBlockElements(XElement parent, StringBuilder sb)
+    private static void ProcessBlockElements(
+        XElement parent, StringBuilder sb,
+        Dictionary<int, int> paraPrHeadingMap, Dictionary<int, int> styleHeadingMap)
     {
         foreach (var child in parent.Elements())
         {
@@ -63,6 +129,12 @@ public sealed class HwpxParser : IDocumentParser
 
             if (localName == "p")
             {
+                // Determine heading level from styleIDRef (primary) or paraPrIDRef (fallback)
+                var headingLevel = GetHeadingLevel(child, paraPrHeadingMap, styleHeadingMap);
+                var headingPrefix = headingLevel > 0
+                    ? new string('#', headingLevel) + " "
+                    : "";
+
                 // Check for embedded tables inside this paragraph (hp:p > hp:run > hp:tbl)
                 var embeddedTables = child.Descendants()
                     .Where(e => e.Name.LocalName == "tbl")
@@ -75,6 +147,7 @@ public sealed class HwpxParser : IDocumentParser
                     if (!string.IsNullOrWhiteSpace(paraText))
                     {
                         if (sb.Length > 0) sb.AppendLine();
+                        sb.Append(headingPrefix);
                         sb.Append(paraText);
                     }
 
@@ -96,6 +169,7 @@ public sealed class HwpxParser : IDocumentParser
                     if (!string.IsNullOrWhiteSpace(paraText))
                     {
                         if (sb.Length > 0) sb.AppendLine();
+                        sb.Append(headingPrefix);
                         sb.Append(paraText);
                     }
                 }
@@ -113,9 +187,33 @@ public sealed class HwpxParser : IDocumentParser
             else if (localName is "sec" or "subList" or "cell" or "drawText")
             {
                 // Recurse into container elements that may hold paragraphs/tables
-                ProcessBlockElements(child, sb);
+                ProcessBlockElements(child, sb, paraPrHeadingMap, styleHeadingMap);
             }
         }
+    }
+
+    /// <summary>
+    /// Determines the heading level (1-7) for a paragraph element.
+    /// Checks styleIDRef first (style may reference a heading paraPr), then falls back to direct paraPrIDRef.
+    /// </summary>
+    private static int GetHeadingLevel(
+        XElement paragraph,
+        Dictionary<int, int> paraPrHeadingMap, Dictionary<int, int> styleHeadingMap)
+    {
+        // Primary: resolve via styleIDRef → style → paraPrIDRef chain
+        var styleIdRefAttr = paragraph.Attribute("styleIDRef");
+        if (styleIdRefAttr is not null
+            && int.TryParse(styleIdRefAttr.Value, out var styleIdRef)
+            && styleHeadingMap.TryGetValue(styleIdRef, out var styleLevel))
+            return styleLevel;
+
+        // Fallback: direct paraPrIDRef lookup
+        var paraPrIdRefAttr = paragraph.Attribute("paraPrIDRef");
+        if (paraPrIdRefAttr is not null
+            && int.TryParse(paraPrIdRefAttr.Value, out var paraPrIdRef))
+            return paraPrHeadingMap.GetValueOrDefault(paraPrIdRef);
+
+        return 0;
     }
 
     /// <summary>

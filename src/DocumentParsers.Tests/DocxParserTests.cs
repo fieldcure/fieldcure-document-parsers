@@ -1,3 +1,7 @@
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
+
 namespace FieldCure.DocumentParsers.Tests;
 
 [TestClass]
@@ -117,6 +121,75 @@ public class DocxParserTests
         // The pipe character inside a cell should be escaped as \|
         Assert.IsTrue(text.Contains("\\|"),
             $"Pipe in cell content should be escaped. Actual:\n{text}");
+    }
+
+    #endregion
+
+    #region Heading detection
+
+    private static byte[] CreateDocxWithHeadings()
+    {
+        using var ms = new MemoryStream();
+        using (var doc = WordprocessingDocument.Create(ms, WordprocessingDocumentType.Document))
+        {
+            var mainPart = doc.AddMainDocumentPart();
+            mainPart.Document = new Document(new Body(
+                new Paragraph(
+                    new ParagraphProperties(new ParagraphStyleId { Val = "Heading1" }),
+                    new Run(new Text("Chapter 1"))),
+                new Paragraph(new Run(new Text("Body paragraph."))),
+                new Paragraph(
+                    new ParagraphProperties(new ParagraphStyleId { Val = "Heading2" }),
+                    new Run(new Text("Section 1.1"))),
+                new Paragraph(new Run(new Text("More body text."))),
+                new Paragraph(
+                    new ParagraphProperties(new ParagraphStyleId { Val = "Heading3" }),
+                    new Run(new Text("Subsection 1.1.1")))
+            ));
+        }
+        return ms.ToArray();
+    }
+
+    [TestMethod]
+    public void WithHeadings_ContainsMarkdownHeadings()
+    {
+        var text = _parser.ExtractText(CreateDocxWithHeadings());
+
+        Assert.IsTrue(text.Contains("# Chapter 1"), $"Expected '# Chapter 1'. Actual:\n{text}");
+        Assert.IsTrue(text.Contains("## Section 1.1"), $"Expected '## Section 1.1'. Actual:\n{text}");
+        Assert.IsTrue(text.Contains("### Subsection 1.1.1"), $"Expected '### Subsection 1.1.1'. Actual:\n{text}");
+    }
+
+    [TestMethod]
+    public void WithHeadings_BodyTextHasNoHashPrefix()
+    {
+        var text = _parser.ExtractText(CreateDocxWithHeadings());
+        var lines = text.Split('\n');
+
+        var bodyLine = lines.FirstOrDefault(l => l.Contains("Body paragraph."));
+        Assert.IsNotNull(bodyLine, "Body paragraph should be present.");
+        Assert.IsFalse(bodyLine.TrimStart().StartsWith('#'), "Body text should not have # prefix.");
+    }
+
+    [TestMethod]
+    public void WithHeadings_OutlineLevelFallback()
+    {
+        using var ms = new MemoryStream();
+        using (var doc = WordprocessingDocument.Create(ms, WordprocessingDocumentType.Document))
+        {
+            var mainPart = doc.AddMainDocumentPart();
+            mainPart.Document = new Document(new Body(
+                new Paragraph(
+                    new ParagraphProperties(new OutlineLevel { Val = 0 }),
+                    new Run(new Text("Outline Heading 1"))),
+                new Paragraph(new Run(new Text("Body.")))
+            ));
+        }
+        var data = ms.ToArray();
+        var text = _parser.ExtractText(data);
+
+        Assert.IsTrue(text.Contains("# Outline Heading 1"),
+            $"OutlineLevel 0 should produce '# '. Actual:\n{text}");
     }
 
     #endregion

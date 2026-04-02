@@ -1,7 +1,7 @@
 namespace FieldCure.DocumentParsers;
 
 /// <summary>
-/// Extracts plain text from a document file for indexing and RAG consumption.
+/// Extracts structured Markdown from a document file for indexing and RAG consumption.
 /// Implementations handle specific file formats (DOCX, HWPX, etc.).
 /// </summary>
 public interface IDocumentParser
@@ -13,11 +13,11 @@ public interface IDocumentParser
     IReadOnlyList<string> SupportedExtensions { get; }
 
     /// <summary>
-    /// Extracts plain text from document bytes.
-    /// Paragraphs are separated by newlines. Tables are converted to markdown format.
+    /// Extracts structured Markdown from document bytes.
+    /// Headings are prefixed with <c>#</c> markers. Tables are converted to markdown pipe format.
     /// </summary>
     /// <param name="data">Raw bytes of the document file.</param>
-    /// <returns>Extracted text suitable for LLM consumption.</returns>
+    /// <returns>Markdown text suitable for LLM consumption.</returns>
     string ExtractText(byte[] data);
 }
 
