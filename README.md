@@ -5,13 +5,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Lightweight document-to-text extraction library for .NET.
-Converts DOCX, HWPX, XLSX, PPTX, and PDF files into plain text
-with markdown table support — designed for LLM/RAG pipelines.
+Converts DOCX, HWPX, XLSX, PPTX, and PDF files into structured Markdown
+with heading detection and table support — designed for LLM/RAG pipelines.
 
 ## Features
 
-- **DOCX** — paragraphs, tables → markdown, math equations → LaTeX
-- **HWPX** — Korean standard format (KS X 6101/OWPML), standalone + embedded tables → markdown, equations → LaTeX
+- **DOCX** — headings (style + outline level), paragraphs, tables → markdown, math equations → LaTeX
+- **HWPX** — Korean standard format (KS X 6101/OWPML), headings (header.xml outline levels), standalone + embedded tables → markdown, equations → LaTeX
 - **XLSX** — sheets → markdown tables (multi-sheet support)
 - **PPTX** — slide text, speaker notes, slide tables → markdown, grouped shapes
 - **PDF** — text extraction (PdfPig) + page image rendering (PDFtoImage) — separate package
@@ -102,19 +102,21 @@ All parsers convert tables to markdown format for LLM comprehension:
 | Supported | Not Yet Supported |
 |-----------|-------------------|
 | Paragraph text | Headers / footers |
-| Tables → markdown (including nested) | Charts / SmartArt |
-| Hyperlink text | Images (embedded) — no OCR |
-| Math equations (OMML → LaTeX) | Comments / tracked changes |
-| Numbered / bulleted lists (as text) | Text boxes / shapes |
-| Multi-section documents | Legacy .doc format (use LibreOffice to convert) |
+| Headings (Heading1–9 style + OutlineLevel) | Charts / SmartArt |
+| Tables → markdown (including nested) | Images (embedded) — no OCR |
+| Hyperlink text | Comments / tracked changes |
+| Math equations (OMML → LaTeX) | Text boxes / shapes |
+| Numbered / bulleted lists (as text) | Legacy .doc format (use LibreOffice to convert) |
+| Multi-section documents | |
 
 ### HWPX
 
 | Supported | Not Yet Supported |
 |-----------|-------------------|
 | Paragraph text (hp:p) | Footnotes / endnotes |
-| Standalone tables (hp:tbl) | Form fields |
-| Embedded tables (hp:p > hp:run > hp:tbl) | Legacy .hwp format (binary, not XML) |
+| Headings (header.xml outline levels) | Form fields |
+| Standalone tables (hp:tbl) | Legacy .hwp format (binary, not XML) |
+| Embedded tables (hp:p > hp:run > hp:tbl) | |
 | Math equations (hp:equation → LaTeX) | |
 | Drawing text (hp:drawText) | |
 | Multi-section documents | |
@@ -159,7 +161,8 @@ src/
 │   ├── Ooxml/                  DocxParser, PptxParser, XlsxParser, OoxmlMathConverter
 │   └── Hwpx/                   HwpxParser, HancomMathNormalizer
 ├── DocumentParsers.Pdf/        FieldCure.DocumentParsers.Pdf (net8.0)
-├── DocumentParsers.Tests/      MSTest — 41 tests
+├── DocumentParsers.Cli/        Console tool for manual output inspection
+├── DocumentParsers.Tests/      MSTest — 48 tests
 └── DocumentParsers.Pdf.Tests/  MSTest — 11 tests
 ```
 

@@ -4,8 +4,8 @@
 
 ## Features
 
-- **DOCX** — Paragraphs, tables (including nested tables), multi-run text via OpenXML SDK
-- **HWPX** — Korean standard format (KS X 6101 / OWPML). Paragraphs, tables, multi-section support
+- **DOCX** — Headings (Heading1–9 + OutlineLevel), paragraphs, tables (including nested), multi-run text via OpenXML SDK
+- **HWPX** — Korean standard format (KS X 6101 / OWPML). Headings (header.xml outline levels), paragraphs, tables, multi-section support
 - **XLSX** — Spreadsheet sheets as markdown tables with SharedString resolution
 - **PPTX** — Slide text, tables, and speaker notes extraction
 - **Math equations** — DOCX (`m:oMath`) and HWPX (`hp:equation`) equations converted to `[math: LaTeX]` blocks
@@ -41,11 +41,13 @@ foreach (var ext in DocumentParserFactory.SupportedExtensions)
 
 ## Output Format
 
-Paragraphs are separated by newlines. Tables are rendered as markdown:
+Headings are prefixed with `#` markers. Tables are rendered as markdown:
 
 ```
-2025 Business Plan
+# 2025 Business Plan
 Please refer to the table below for details.
+
+## Financial Summary
 
 | Category | Q1 | Q2 |
 | --- | --- | --- |

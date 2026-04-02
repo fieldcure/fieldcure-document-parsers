@@ -1,5 +1,16 @@
 # Release Notes — FieldCure.DocumentParsers
 
+## [0.4.0] - 2026-04-02
+
+### Added
+- `HwpxParser` heading detection — parses `header.xml` outline levels via paraPr/style chains, outputs `#`–`#######` Markdown headings
+- `DocxParser` heading detection — resolves `ParagraphStyleId` (Heading1–9) with `OutlineLevel` fallback
+- `DocumentParsers.Cli` console project for manual output inspection (`dotnet run --project src/DocumentParsers.Cli -- <file>`)
+
+### Changed
+- `ExtractText()` output upgraded from plain text to structured Markdown (headings + tables)
+- `IDocumentParser` XML documentation updated to reflect Markdown output contract
+
 ## [0.3.0] - 2026-03-27
 
 ### Added
