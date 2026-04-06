@@ -14,7 +14,7 @@ namespace FieldCure.DocumentParsers;
 ///   <item><c>REL rarrow {label}</c> labeled-arrow pattern</item>
 /// </list>
 /// </summary>
-public static partial class HancomMathNormalizer
+internal static partial class HancomMathNormalizer
 {
     #region Conversion Maps
 
