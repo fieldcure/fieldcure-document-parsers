@@ -45,7 +45,7 @@ Requires .NET 8.0 SDK (global.json pins SDK 9.0.308; both 8.0 and 9.0 are used i
 - `Hwpx/HwpxParser` — HWPX (Korean OWPML) via ZipArchive + XLinq (paragraphs, tables, equations)
 - `PdfParser` — PDF via PdfPig (text) + PDFtoImage (page rendering as PNG)
 
-**Math equation conversion:**
+**Math equation conversion (internal):**
 - `OoxmlMathConverter` — Converts OOXML `m:oMath` elements to LaTeX, output wrapped in `[math: ...]`
 - `HancomMathNormalizer` — Converts Hancom equation script to LaTeX (200+ token mappings, ported from hml-equation-parser)
 

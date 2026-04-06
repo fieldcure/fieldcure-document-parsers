@@ -158,11 +158,11 @@ All parsers convert tables to markdown format for LLM comprehension:
 ```
 src/
 ├── DocumentParsers/            FieldCure.DocumentParsers (net8.0)
-│   ├── Ooxml/                  DocxParser, PptxParser, XlsxParser, OoxmlMathConverter
-│   └── Hwpx/                   HwpxParser, HancomMathNormalizer
+│   ├── Ooxml/                  DocxParser, PptxParser, XlsxParser
+│   └── Hwpx/                   HwpxParser
 ├── DocumentParsers.Pdf/        FieldCure.DocumentParsers.Pdf (net8.0)
 ├── DocumentParsers.Cli/        Console tool for manual output inspection
-├── DocumentParsers.Tests/      MSTest — 48 tests
+├── DocumentParsers.Tests/      MSTest — 70 tests
 └── DocumentParsers.Pdf.Tests/  MSTest — 11 tests
 ```
 
