@@ -9,7 +9,7 @@ namespace FieldCure.DocumentParsers;
 /// Greek letters and other Unicode characters are preserved as-is;
 /// only structural elements (fractions, subscripts, etc.) are converted to LaTeX commands.
 /// </summary>
-public static class OoxmlMathConverter
+internal static class OoxmlMathConverter
 {
     /// <summary>
     /// Converts an OOXML math element to a LaTeX string.
