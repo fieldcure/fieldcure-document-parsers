@@ -1,5 +1,19 @@
 # Release Notes — FieldCure.DocumentParsers
 
+## [1.0.0] - 2026-04-06
+
+### Added
+- `XlsxParser` unit tests — 9 tests covering two-sheet extraction, markdown table output
+- `PptxParser` unit tests — 11 tests covering three-slide extraction, slide headers, table output
+
+### Changed
+- `OoxmlMathConverter` and `HancomMathNormalizer` are now `internal` (previously `public`) — these are implementation details not intended for direct consumption
+- Test count increased from 48 to 70
+
+### Note
+This is the first stable release. Public API surface is now committed:
+`IDocumentParser`, `IMediaDocumentParser`, `DocumentImage`, `DocumentParserFactory`, and all five parser classes (`DocxParser`, `HwpxParser`, `XlsxParser`, `PptxParser`, `PdfParser`).
+
 ## [0.4.0] - 2026-04-02
 
 ### Added

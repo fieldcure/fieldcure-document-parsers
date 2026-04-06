@@ -1,5 +1,11 @@
 # Release Notes — FieldCure.DocumentParsers.Pdf
 
+## [1.0.0] - 2026-04-06
+
+### Note
+First stable release, aligned with FieldCure.DocumentParsers 1.0.0.
+No API changes from 0.2.0 — public surface (`PdfParser`, `AddPdfSupport()`) is now committed as stable.
+
 ## [0.2.0] - 2026-03-27
 
 ### Added
