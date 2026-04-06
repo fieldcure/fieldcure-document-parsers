@@ -6,7 +6,7 @@ on:
 
 jobs:
   release:
-    if: startsWith(github.event.head_commit.message, 'Release v')
+    if: startsWith(github.event.head_commit.message, 'Release ')
     runs-on: windows-latest
 
     permissions:
@@ -15,33 +15,53 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Extract version
-        id: version
+      - name: Parse commit message
+        id: parse
         shell: bash
         run: |
           MESSAGE="${{ github.event.head_commit.message }}"
-          VERSION=$(echo "$MESSAGE" | sed -n 's/.*Release v\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # "Release vX.X.X" (all) or "Release <Name> vX.X.X" (single)
+          if echo "$MESSAGE" | grep -qE '^Release v[0-9]'; then
+            VERSION=$(echo "$MESSAGE" | sed -n 's/Release v\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+            echo "name=" >> "$GITHUB_OUTPUT"
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+          else
+            PACKAGE=$(echo "$MESSAGE" | sed -n 's/Release \(.*\) v[0-9].*/\1/p')
+            VERSION=$(echo "$MESSAGE" | sed -n 's/.*v\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
+            TAG_NAME=$(echo "$PACKAGE" | tr '[:upper:]' '[:lower:]')
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "tag=${TAG_NAME}-v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "name=$PACKAGE" >> "$GITHUB_OUTPUT"
+            echo "mode=single" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build release body
         shell: bash
         run: |
-          {
-            echo "# DocumentParsers"
-            echo ""
-            cat RELEASENOTES.DocumentParsers.md
-            echo ""
-            echo "---"
-            echo ""
-            echo "# DocumentParsers.Pdf"
-            echo ""
-            cat RELEASENOTES.DocumentParsers.Pdf.md
-          } > RELEASE_BODY.md
+          MODE="${{ steps.parse.outputs.mode }}"
+          NAME="${{ steps.parse.outputs.name }}"
+          if [ "$MODE" = "all" ]; then
+            {
+              echo "# DocumentParsers"
+              echo ""
+              cat RELEASENOTES.DocumentParsers.md
+              echo ""
+              echo "---"
+              echo ""
+              echo "# DocumentParsers.Pdf"
+              echo ""
+              cat RELEASENOTES.DocumentParsers.Pdf.md
+            } > RELEASE_BODY.md
+          else
+            cp "RELEASENOTES.${NAME}.md" RELEASE_BODY.md
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.parse.outputs.tag }}
+          name: ${{ steps.parse.outputs.name && format('{0} v{1}', steps.parse.outputs.name, steps.parse.outputs.version) || format('v{0}', steps.parse.outputs.version) }}
           body_path: RELEASE_BODY.md
           generate_release_notes: false
