@@ -209,7 +209,7 @@ public sealed class DocxParser : IDocumentParser
     {
         var map = new Dictionary<int, string>();
         var footnotesPart = mainPart.FootnotesPart;
-        if (footnotesPart is null) return map;
+        if (footnotesPart?.Footnotes is null) return map;
 
         foreach (var footnote in footnotesPart.Footnotes.Elements<Footnote>())
         {
@@ -235,7 +235,7 @@ public sealed class DocxParser : IDocumentParser
     {
         var map = new Dictionary<int, string>();
         var endnotesPart = mainPart.EndnotesPart;
-        if (endnotesPart is null) return map;
+        if (endnotesPart?.Endnotes is null) return map;
 
         foreach (var endnote in endnotesPart.Endnotes.Elements<Endnote>())
         {
@@ -261,7 +261,7 @@ public sealed class DocxParser : IDocumentParser
     {
         var map = new Dictionary<int, (string? Author, string? Date, string Text)>();
         var commentsPart = mainPart.WordprocessingCommentsPart;
-        if (commentsPart is null) return map;
+        if (commentsPart?.Comments is null) return map;
 
         foreach (var comment in commentsPart.Comments.Elements<Comment>())
         {
