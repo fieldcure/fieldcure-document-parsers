@@ -104,15 +104,17 @@ public class HwpxEnhancedTests
                     <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
                             xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
                       <hp:p>
-                        <hp:run><hp:t>본문 텍스트</hp:t></hp:run>
                         <hp:run>
-                          <hp:footnote>
-                            <hp:subList>
-                              <hp:p><hp:run><hp:t>각주 내용</hp:t></hp:run></hp:p>
-                            </hp:subList>
-                          </hp:footnote>
+                          <hp:t>본문 텍스트</hp:t>
+                          <hp:ctrl>
+                            <hp:footNote number="1" instId="1">
+                              <hp:subList>
+                                <hp:p><hp:run><hp:t>각주 내용</hp:t></hp:run></hp:p>
+                              </hp:subList>
+                            </hp:footNote>
+                          </hp:ctrl>
+                          <hp:t>이후 텍스트</hp:t>
                         </hp:run>
-                        <hp:run><hp:t>이후 텍스트</hp:t></hp:run>
                       </hp:p>
                     </hs:sec>
                     """);
@@ -149,13 +151,15 @@ public class HwpxEnhancedTests
                     <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
                             xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
                       <hp:p>
-                        <hp:run><hp:t>본문</hp:t></hp:run>
                         <hp:run>
-                          <hp:endnote>
-                            <hp:subList>
-                              <hp:p><hp:run><hp:t>미주 내용</hp:t></hp:run></hp:p>
-                            </hp:subList>
-                          </hp:endnote>
+                          <hp:t>본문</hp:t>
+                          <hp:ctrl>
+                            <hp:endNote number="1" instId="1">
+                              <hp:subList>
+                                <hp:p><hp:run><hp:t>미주 내용</hp:t></hp:run></hp:p>
+                              </hp:subList>
+                            </hp:endNote>
+                          </hp:ctrl>
                         </hp:run>
                       </hp:p>
                     </hs:sec>
@@ -175,7 +179,7 @@ public class HwpxEnhancedTests
         var data = CreateHwpxWithMemo();
         var text = _parser.ExtractText(data);
 
-        Assert.IsTrue(text.Contains("> **[Comment]:**"), $"Should contain memo as comment. Actual:\n{text}");
+        Assert.IsTrue(text.Contains("> **[Comment"), $"Should contain memo as comment. Actual:\n{text}");
         Assert.IsTrue(text.Contains("메모 내용"), $"Should contain memo text. Actual:\n{text}");
     }
 
@@ -201,13 +205,19 @@ public class HwpxEnhancedTests
                     <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
                             xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
                       <hp:p>
-                        <hp:run><hp:t>검토 대상 텍스트</hp:t></hp:run>
                         <hp:run>
-                          <hp:memo>
-                            <hp:subList>
-                              <hp:p><hp:run><hp:t>메모 내용</hp:t></hp:run></hp:p>
-                            </hp:subList>
-                          </hp:memo>
+                          <hp:t>검토 대상 텍스트</hp:t>
+                          <hp:ctrl>
+                            <hp:fieldBegin type="MEMO">
+                              <hp:parameters cnt="2" name="">
+                                <hp:stringParam name="Author">홍길동</hp:stringParam>
+                                <hp:stringParam name="CreateDateTime">2026-04-07T12:00:00Z</hp:stringParam>
+                              </hp:parameters>
+                              <hp:subList>
+                                <hp:p><hp:run><hp:t>메모 내용</hp:t></hp:run></hp:p>
+                              </hp:subList>
+                            </hp:fieldBegin>
+                          </hp:ctrl>
                         </hp:run>
                       </hp:p>
                     </hs:sec>

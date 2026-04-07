@@ -84,6 +84,9 @@ public sealed class PptxParser : IDocumentParser
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>
+    /// Extracts text from all shapes in a slide's shape tree, including grouped shapes and tables.
+    /// </summary>
     private static void ExtractShapeTreeText(ShapeTree shapeTree, StringBuilder sb)
     {
         foreach (var shape in shapeTree.ChildElements)
@@ -136,6 +139,9 @@ public sealed class PptxParser : IDocumentParser
         }
     }
 
+    /// <summary>
+    /// Extracts text from a Drawing paragraph, including runs and field elements.
+    /// </summary>
     private static string GetParagraphText(A.Paragraph paragraph)
     {
         var sb = new StringBuilder();
@@ -153,6 +159,9 @@ public sealed class PptxParser : IDocumentParser
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Extracts speaker notes text from a slide's notes part.
+    /// </summary>
     private static string ExtractNotesText(NotesSlidePart notesPart)
     {
         var sb = new StringBuilder();
@@ -178,6 +187,9 @@ public sealed class PptxParser : IDocumentParser
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Converts a Drawing table to a markdown-formatted pipe table string.
+    /// </summary>
     private static string ConvertTableToMarkdown(A.Table table)
     {
         var rows = table.Elements<A.TableRow>().ToList();

@@ -121,6 +121,9 @@ public sealed class XlsxParser : IDocumentParser
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>
+    /// Resolves a cell's display value, handling shared strings and inline strings.
+    /// </summary>
     private static string GetCellValue(Cell cell, string[] sharedStrings)
     {
         var value = cell.CellValue?.InnerText;

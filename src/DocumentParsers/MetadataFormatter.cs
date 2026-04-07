@@ -38,12 +38,18 @@ internal static class MetadataFormatter
         return $"---\n{sb}---\n\n";
     }
 
+    /// <summary>
+    /// Appends a YAML key-value field to the builder if the value is non-empty.
+    /// </summary>
     private static void AppendField(StringBuilder sb, string key, string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return;
         sb.AppendLine($"{key}: {EscapeYamlValue(value)}");
     }
 
+    /// <summary>
+    /// Wraps the value in double quotes if it contains YAML special characters.
+    /// </summary>
     private static string EscapeYamlValue(string value)
     {
         // Quote if value contains YAML special characters

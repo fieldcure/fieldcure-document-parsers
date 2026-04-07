@@ -371,9 +371,9 @@ public sealed class HwpxParser : IDocumentParser
         ref int footnoteCounter, ref int endnoteCounter)
     {
         var hasFootnotes = options.IncludeFootnotes && paragraph.Descendants()
-            .Any(e => e.Name.LocalName == "footnote");
+            .Any(e => e.Name.LocalName.Equals("footNote", StringComparison.OrdinalIgnoreCase));
         var hasEndnotes = options.IncludeEndnotes && paragraph.Descendants()
-            .Any(e => e.Name.LocalName == "endnote");
+            .Any(e => e.Name.LocalName.Equals("endNote", StringComparison.OrdinalIgnoreCase));
 
         if (!hasFootnotes && !hasEndnotes)
             return ExtractParagraphText(paragraph);
@@ -397,35 +397,21 @@ public sealed class HwpxParser : IDocumentParser
         {
             var localName = child.Name.LocalName;
 
-            if (localName == "footnote" && options.IncludeFootnotes)
+            if (localName.Equals("footNote", StringComparison.OrdinalIgnoreCase) && options.IncludeFootnotes)
             {
                 footnoteCounter++;
-                var subList = child.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
-                var content = "";
-                if (subList is not null)
-                {
-                    var paragraphs = subList.Descendants()
-                        .Where(e => e.Name.LocalName == "p")
-                        .Select(ExtractParagraphText)
-                        .Where(t => !string.IsNullOrWhiteSpace(t));
-                    content = string.Join(" ", paragraphs);
-                }
+                var content = ExtractNoteContent(child);
                 sb.Append(footnoteCollector.AddFootnote(footnoteCounter, content));
             }
-            else if (localName == "endnote" && options.IncludeEndnotes)
+            else if (localName.Equals("endNote", StringComparison.OrdinalIgnoreCase) && options.IncludeEndnotes)
             {
                 endnoteCounter++;
-                var subList = child.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
-                var content = "";
-                if (subList is not null)
-                {
-                    var paragraphs = subList.Descendants()
-                        .Where(e => e.Name.LocalName == "p")
-                        .Select(ExtractParagraphText)
-                        .Where(t => !string.IsNullOrWhiteSpace(t));
-                    content = string.Join(" ", paragraphs);
-                }
+                var content = ExtractNoteContent(child);
                 sb.Append(footnoteCollector.AddEndnote(endnoteCounter, content));
+            }
+            else if (localName.Equals("fieldBegin", StringComparison.OrdinalIgnoreCase))
+            {
+                // Memo fields — skip content (handled separately by ExtractMemos)
             }
             else if (localName == "equation")
             {
@@ -442,12 +428,13 @@ public sealed class HwpxParser : IDocumentParser
             {
                 sb.Append(child.Value);
             }
-            else if (localName is "tbl" or "memo")
+            else if (localName is "tbl")
             {
-                // Skip tables and memos — handled separately
+                // Skip tables — handled separately
             }
             else
             {
+                // Recurse into runs, ctrl, etc.
                 ExtractWithNotes(child, sb, options, footnoteCollector,
                     ref footnoteCounter, ref endnoteCounter);
             }
@@ -455,34 +442,91 @@ public sealed class HwpxParser : IDocumentParser
     }
 
     /// <summary>
-    /// Extracts memo elements from a paragraph as comment blockquotes.
+    /// Extracts memo (comment) fields from a paragraph as blockquotes.
+    /// Memos in HWPX use hp:fieldBegin[type="MEMO"] with content in hp:subList.
+    /// Author and date are in hp:parameters child elements.
     /// </summary>
     private static string ExtractMemos(XElement paragraph)
     {
-        var memos = paragraph.Descendants()
-            .Where(e => e.Name.LocalName == "memo")
+        var memoFields = paragraph.Descendants()
+            .Where(e => e.Name.LocalName == "fieldBegin"
+                     && string.Equals(e.Attribute("type")?.Value, "MEMO", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (memos.Count == 0) return "";
+        if (memoFields.Count == 0) return "";
 
         var sb = new StringBuilder();
-        foreach (var memo in memos)
+        foreach (var memo in memoFields)
         {
-            var textParts = memo.Descendants()
+            // Extract author from parameters
+            string? author = null;
+            string? dateStr = null;
+            var parameters = memo.Elements().FirstOrDefault(e => e.Name.LocalName == "parameters");
+            if (parameters is not null)
+            {
+                foreach (var param in parameters.Elements())
+                {
+                    var name = param.Attribute("name")?.Value;
+                    if (name == "Author") author = param.Value;
+                    else if (name == "CreateDateTime") dateStr = param.Value;
+                }
+            }
+
+            // Extract text from subList
+            var subList = memo.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
+            if (subList is null) continue;
+
+            var textParts = subList.Descendants()
                 .Where(e => e.Name.LocalName == "t")
                 .Select(e => e.Value)
                 .Where(t => !string.IsNullOrWhiteSpace(t));
             var text = string.Join(" ", textParts);
 
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                if (sb.Length > 0) sb.AppendLine();
-                sb.Append($"> **[Comment]:** {text}");
-            }
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            // Format date if present
+            string? date = null;
+            if (dateStr is not null && DateTime.TryParse(dateStr, out var parsedDate))
+                date = parsedDate.ToString("yyyy-MM-dd");
+
+            // Format label
+            var label = author is not null && date is not null
+                ? $"[Comment — {author}, {date}]:"
+                : author is not null ? $"[Comment — {author}]:"
+                : "[Comment]:";
+
+            if (sb.Length > 0) sb.AppendLine();
+            sb.Append($"> **{label}** {text}");
         }
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Extracts text content from a footnote or endnote element's subList.
+    /// Uses direct text extraction without note/memo exclusion filters.
+    /// </summary>
+    private static string ExtractNoteContent(XElement noteElement)
+    {
+        var subList = noteElement.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
+        if (subList is null) return "";
+
+        var textNodes = subList.Descendants()
+            .Where(e => e.Name.LocalName == "t");
+        var sb = new StringBuilder();
+        foreach (var t in textNodes)
+            sb.Append(t.Value);
+        var result = sb.ToString().Trim();
+        return result;
+    }
+
+    /// <summary>
+    /// Checks whether a local name is a note or memo container whose text should be excluded from body output.
+    /// </summary>
+    private static bool IsNoteOrMemoElement(string localName)
+        => localName.Equals("footNote", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("endNote", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("fieldBegin", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Extracts and concatenates all text from hp:t elements within a single paragraph (hp:p).
@@ -498,8 +542,10 @@ public sealed class HwpxParser : IDocumentParser
         if (!hasEquations)
         {
             // Fast path: no equations, just concatenate text nodes
+            // Exclude text inside footnote/endnote/memo elements
             var textNodes = paragraph.Descendants()
-                .Where(e => e.Name.LocalName == "t");
+                .Where(e => e.Name.LocalName == "t"
+                         && !e.Ancestors().Any(a => IsNoteOrMemoElement(a.Name.LocalName)));
             var plainSb = new StringBuilder();
             foreach (var t in textNodes)
                 plainSb.Append(t.Value);
@@ -537,13 +583,13 @@ public sealed class HwpxParser : IDocumentParser
             {
                 sb.Append(child.Value);
             }
-            else if (localName is "tbl")
+            else if (localName is "tbl" || IsNoteOrMemoElement(localName))
             {
-                // Skip tables — handled separately
+                // Skip tables, footnotes, endnotes, and memos — handled separately
             }
             else
             {
-                // Recurse into runs, subList, etc.
+                // Recurse into runs, ctrl, subList, etc.
                 ExtractWithEquations(child, sb);
             }
         }

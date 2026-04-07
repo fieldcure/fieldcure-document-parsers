@@ -281,6 +281,9 @@ public sealed class DocxParser : IDocumentParser
         return map;
     }
 
+    /// <summary>
+    /// Formats the label for a comment blockquote, including author and date if available.
+    /// </summary>
     private static string FormatCommentLabel(string? author, string? date)
     {
         if (author is not null && date is not null)
