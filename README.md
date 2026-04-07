@@ -173,11 +173,9 @@ dotnet build
 dotnet test
 ```
 
-## Used By
+## See Also
 
-- [AssistStudio](https://github.com/fieldcure/fieldcure-assiststudio) — WinUI 3 AI chat application
-- [FieldCure.Mcp.Rag](https://github.com/fieldcure/fieldcure-mcp-rag) — RAG MCP server
-- [FieldCure.Mcp.Filesystem](https://github.com/fieldcure/fieldcure-mcp-filesystem) — Filesystem MCP server
+Part of the [AssistStudio ecosystem](https://github.com/fieldcure/fieldcure-assiststudio#ecosystem).
 
 ## Release Notes
 
