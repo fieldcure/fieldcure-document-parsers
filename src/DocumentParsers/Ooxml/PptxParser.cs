@@ -18,18 +18,40 @@ public sealed class PptxParser : IDocumentParser
 
     /// <inheritdoc />
     public string ExtractText(byte[] data)
+        => ExtractText(data, ExtractionOptions.Default);
+
+    /// <summary>
+    /// Extracts text from PPTX bytes with configurable extraction options.
+    /// </summary>
+    public string ExtractText(byte[] data, ExtractionOptions options)
     {
         using var stream = new MemoryStream(data);
         using var doc = PresentationDocument.Open(stream, false);
         var presentationPart = doc.PresentationPart;
         if (presentationPart is null) return "";
 
-        var slideIdList = presentationPart.Presentation?.SlideIdList;
-        if (slideIdList is null) return "";
-        var slideIds = slideIdList.Elements<SlideId>().ToList();
-        if (slideIds.Count == 0) return "";
-
         var sb = new StringBuilder();
+
+        // Metadata — YAML front matter
+        if (options.IncludeMetadata)
+        {
+            var props = doc.PackageProperties;
+            var yaml = MetadataFormatter.FormatYamlFrontMatter(
+                title: props.Title,
+                author: props.Creator,
+                created: props.Created,
+                modified: props.Modified,
+                subject: props.Subject,
+                keywords: props.Keywords,
+                description: props.Description);
+            sb.Append(yaml);
+        }
+
+        var slideIdList = presentationPart.Presentation?.SlideIdList;
+        if (slideIdList is null) return sb.ToString().TrimEnd();
+        var slideIds = slideIdList.Elements<SlideId>().ToList();
+        if (slideIds.Count == 0) return sb.ToString().TrimEnd();
+
         var slideNumber = 0;
 
         foreach (var slideId in slideIds)

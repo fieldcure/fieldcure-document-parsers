@@ -18,26 +18,93 @@ public sealed class DocxParser : IDocumentParser
 
     /// <inheritdoc />
     public string ExtractText(byte[] data)
+        => ExtractText(data, ExtractionOptions.Default);
+
+    /// <summary>
+    /// Extracts structured Markdown from DOCX bytes with configurable extraction options.
+    /// </summary>
+    public string ExtractText(byte[] data, ExtractionOptions options)
     {
         using var stream = new MemoryStream(data);
         using var doc = WordprocessingDocument.Open(stream, false);
-        var body = doc.MainDocumentPart?.Document?.Body;
-        if (body is null) return "";
+        var mainPart = doc.MainDocumentPart;
+        var body = mainPart?.Document?.Body;
+        if (body is null || mainPart is null) return "";
 
         var sb = new StringBuilder();
+
+        // Metadata — YAML front matter
+        if (options.IncludeMetadata)
+        {
+            var props = doc.PackageProperties;
+            var yaml = MetadataFormatter.FormatYamlFrontMatter(
+                title: props.Title,
+                author: props.Creator,
+                created: props.Created,
+                modified: props.Modified,
+                subject: props.Subject,
+                keywords: props.Keywords,
+                description: props.Description);
+            sb.Append(yaml);
+        }
+
+        // Headers — blockquote before body
+        if (options.IncludeHeaders)
+        {
+            var headerText = ExtractHeaderFooterText(mainPart, isHeader: true);
+            if (!string.IsNullOrEmpty(headerText))
+            {
+                sb.Append(headerText);
+                sb.AppendLine();
+            }
+        }
+
+        // Pre-load footnotes and endnotes for inline reference
+        var footnoteMap = new Dictionary<int, string>();
+        var endnoteMap = new Dictionary<int, string>();
+        var footnoteCollector = new FootnoteCollector();
+
+        if (options.IncludeFootnotes)
+            footnoteMap = LoadFootnotes(mainPart);
+        if (options.IncludeEndnotes)
+            endnoteMap = LoadEndnotes(mainPart);
+
+        // Pre-load comments for inline insertion
+        var commentMap = new Dictionary<int, (string? Author, string? Date, string Text)>();
+        if (options.IncludeComments)
+            commentMap = LoadComments(mainPart);
+
+        // Track comment ranges — which paragraph a CommentReference appears in
+        var bodyStartLen = sb.Length;
 
         foreach (var element in body.ChildElements)
         {
             if (element is Paragraph paragraph)
             {
-                var text = ExtractParagraphText(paragraph);
+                var text = ExtractParagraphText(paragraph, options, footnoteMap, endnoteMap, footnoteCollector);
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    if (sb.Length > 0) sb.AppendLine();
+                    if (sb.Length > bodyStartLen) sb.AppendLine();
                     var headingLevel = GetHeadingLevel(paragraph);
                     if (headingLevel > 0)
                         sb.Append(new string('#', headingLevel) + " ");
                     sb.Append(text);
+                }
+
+                // Inline comments — output after the paragraph containing CommentReference
+                if (options.IncludeComments)
+                {
+                    foreach (var commentRef in paragraph.Descendants<CommentReference>())
+                    {
+                        var id = commentRef.Id?.Value;
+                        if (id is not null && int.TryParse(id, out var commentId) && commentMap.TryGetValue(commentId, out var comment))
+                        {
+                            sb.AppendLine();
+                            sb.AppendLine();
+                            var label = FormatCommentLabel(comment.Author, comment.Date);
+                            sb.Append($"> **{label}** {comment.Text}");
+                        }
+                    }
                 }
             }
             else if (element is Table table)
@@ -45,13 +112,182 @@ public sealed class DocxParser : IDocumentParser
                 var tableText = ConvertTableToMarkdown(table);
                 if (!string.IsNullOrEmpty(tableText))
                 {
-                    if (sb.Length > 0) { sb.AppendLine(); sb.AppendLine(); }
+                    if (sb.Length > bodyStartLen) { sb.AppendLine(); sb.AppendLine(); }
                     sb.Append(tableText);
                 }
             }
         }
 
-        return sb.ToString();
+        // Footers — blockquote after body
+        if (options.IncludeFooters)
+        {
+            var footerText = ExtractHeaderFooterText(mainPart, isHeader: false);
+            if (!string.IsNullOrEmpty(footerText))
+            {
+                sb.AppendLine();
+                sb.AppendLine();
+                sb.Append(footerText);
+            }
+        }
+
+        // Footnotes and endnotes sections at end
+        if (options.IncludeFootnotes || options.IncludeEndnotes)
+        {
+            var notesSections = footnoteCollector.RenderAll();
+            if (!string.IsNullOrEmpty(notesSections))
+                sb.Append(notesSections);
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Extracts header or footer text from document sections as blockquote lines.
+    /// </summary>
+    private static string ExtractHeaderFooterText(MainDocumentPart mainPart, bool isHeader)
+    {
+        var sb = new StringBuilder();
+        var sectionProps = mainPart.Document?.Body?.Descendants<SectionProperties>() ?? [];
+
+        foreach (var secProps in sectionProps)
+        {
+            if (isHeader)
+            {
+                foreach (var headerRef in secProps.Elements<HeaderReference>())
+                {
+                    var part = mainPart.GetPartById(headerRef.Id!) as HeaderPart;
+                    if (part is null) continue;
+
+                    var text = ExtractPartText(part.Header);
+                    if (string.IsNullOrWhiteSpace(text)) continue;
+
+                    var type = headerRef.Type?.Value;
+                    var typeLabel = type == HeaderFooterValues.First ? "[Header — First Page]:"
+                        : type == HeaderFooterValues.Even ? "[Header — Even]:"
+                        : "[Header]:";
+                    sb.AppendLine($"> **{typeLabel}** {text}");
+                }
+            }
+            else
+            {
+                foreach (var footerRef in secProps.Elements<FooterReference>())
+                {
+                    var part = mainPart.GetPartById(footerRef.Id!) as FooterPart;
+                    if (part is null) continue;
+
+                    var text = ExtractPartText(part.Footer);
+                    if (string.IsNullOrWhiteSpace(text)) continue;
+
+                    var type = footerRef.Type?.Value;
+                    var typeLabel = type == HeaderFooterValues.First ? "[Footer — First Page]:"
+                        : type == HeaderFooterValues.Even ? "[Footer — Even]:"
+                        : "[Footer]:";
+                    sb.AppendLine($"> **{typeLabel}** {text}");
+                }
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Extracts plain text from a header or footer element.
+    /// </summary>
+    private static string ExtractPartText(OpenXmlCompositeElement? element)
+    {
+        if (element is null) return "";
+        var paragraphs = element.Elements<Paragraph>()
+            .Select(p => p.InnerText)
+            .Where(t => !string.IsNullOrWhiteSpace(t));
+        return string.Join(" ", paragraphs);
+    }
+
+    /// <summary>
+    /// Loads footnotes from the document, skipping system-reserved ids (0 and 1).
+    /// </summary>
+    private static Dictionary<int, string> LoadFootnotes(MainDocumentPart mainPart)
+    {
+        var map = new Dictionary<int, string>();
+        var footnotesPart = mainPart.FootnotesPart;
+        if (footnotesPart is null) return map;
+
+        foreach (var footnote in footnotesPart.Footnotes.Elements<Footnote>())
+        {
+            if (footnote.Id?.Value is not { } idLong) continue;
+            var id = (int)idLong;
+            if (id <= 1) continue; // Skip separator (0) and continuation separator (1)
+
+            var text = string.Join(" ", footnote.Elements<Paragraph>()
+                .Select(p => p.InnerText)
+                .Where(t => !string.IsNullOrWhiteSpace(t)));
+
+            if (!string.IsNullOrWhiteSpace(text))
+                map[id] = text;
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Loads endnotes from the document, skipping system-reserved ids (0 and 1).
+    /// </summary>
+    private static Dictionary<int, string> LoadEndnotes(MainDocumentPart mainPart)
+    {
+        var map = new Dictionary<int, string>();
+        var endnotesPart = mainPart.EndnotesPart;
+        if (endnotesPart is null) return map;
+
+        foreach (var endnote in endnotesPart.Endnotes.Elements<Endnote>())
+        {
+            if (endnote.Id?.Value is not { } idLong) continue;
+            var id = (int)idLong;
+            if (id <= 1) continue;
+
+            var text = string.Join(" ", endnote.Elements<Paragraph>()
+                .Select(p => p.InnerText)
+                .Where(t => !string.IsNullOrWhiteSpace(t)));
+
+            if (!string.IsNullOrWhiteSpace(text))
+                map[id] = text;
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Loads comments from the document.
+    /// </summary>
+    private static Dictionary<int, (string? Author, string? Date, string Text)> LoadComments(MainDocumentPart mainPart)
+    {
+        var map = new Dictionary<int, (string? Author, string? Date, string Text)>();
+        var commentsPart = mainPart.WordprocessingCommentsPart;
+        if (commentsPart is null) return map;
+
+        foreach (var comment in commentsPart.Comments.Elements<Comment>())
+        {
+            if (comment.Id?.Value is not { } idStr) continue;
+            if (!int.TryParse(idStr, out var id)) continue;
+
+            var author = comment.Author?.Value;
+            var date = comment.Date?.HasValue == true ? comment.Date.Value.ToString("yyyy-MM-dd") : null;
+            var text = string.Join(" ", comment.Elements<Paragraph>()
+                .Select(p => p.InnerText)
+                .Where(t => !string.IsNullOrWhiteSpace(t)));
+
+            if (!string.IsNullOrWhiteSpace(text))
+                map[id] = (author, date, text);
+        }
+
+        return map;
+    }
+
+    private static string FormatCommentLabel(string? author, string? date)
+    {
+        if (author is not null && date is not null)
+            return $"[Comment — {author}, {date}]:";
+        if (author is not null)
+            return $"[Comment — {author}]:";
+        return "[Comment]:";
     }
 
     /// <summary>
@@ -79,19 +315,27 @@ public sealed class DocxParser : IDocumentParser
     }
 
     /// <summary>
-    /// Extracts text from a paragraph, converting inline math elements to LaTeX notation.
-    /// Block-level math (oMathPara) is output on its own line.
+    /// Extracts text from a paragraph, converting inline math elements to LaTeX notation
+    /// and inserting footnote/endnote reference markers.
     /// </summary>
-    private static string ExtractParagraphText(Paragraph paragraph)
+    private static string ExtractParagraphText(
+        Paragraph paragraph,
+        ExtractionOptions options,
+        Dictionary<int, string> footnoteMap,
+        Dictionary<int, string> endnoteMap,
+        FootnoteCollector footnoteCollector)
     {
         // Check if this paragraph contains any math elements
         var hasMath = paragraph.Descendants<OoxmlMath.OfficeMath>().Any()
                    || paragraph.Descendants<OoxmlMath.Paragraph>().Any();
 
-        if (!hasMath)
+        var hasNotes = (options.IncludeFootnotes && paragraph.Descendants<FootnoteReference>().Any())
+                    || (options.IncludeEndnotes && paragraph.Descendants<EndnoteReference>().Any());
+
+        if (!hasMath && !hasNotes)
             return paragraph.InnerText;
 
-        // Process children sequentially to preserve math structure
+        // Process children sequentially to preserve math structure and note references
         var sb = new StringBuilder();
         foreach (var child in paragraph.ChildElements)
         {
@@ -114,12 +358,83 @@ public sealed class DocxParser : IDocumentParser
                         sb.Append($"[math: {inlineLatex}]");
                     break;
 
-                // Regular text run
+                // Regular text run — may contain footnote/endnote references
+                case Run run:
+                    foreach (var runChild in run.ChildElements)
+                    {
+                        if (runChild is FootnoteReference fnRef && options.IncludeFootnotes)
+                        {
+                            if (fnRef.Id?.Value is { } fnIdLong)
+                            {
+                                var fnId = (int)fnIdLong;
+                                if (footnoteMap.TryGetValue(fnId, out var fnText))
+                                    sb.Append(footnoteCollector.AddFootnote(fnId, fnText));
+                            }
+                        }
+                        else if (runChild is EndnoteReference enRef && options.IncludeEndnotes)
+                        {
+                            if (enRef.Id?.Value is { } enIdLong)
+                            {
+                                var enId = (int)enIdLong;
+                                if (endnoteMap.TryGetValue(enId, out var enText))
+                                    sb.Append(footnoteCollector.AddEndnote(enId, enText));
+                            }
+                        }
+                        else if (runChild is Text text)
+                        {
+                            sb.Append(text.Text);
+                        }
+                    }
+                    break;
+
+                // Other elements (bookmarks, etc.) — extract inner text
+                default:
+                    var txt = child.InnerText;
+                    if (!string.IsNullOrEmpty(txt))
+                        sb.Append(txt);
+                    break;
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Legacy overload for internal use (table cells, etc.) without note processing.
+    /// </summary>
+    private static string ExtractParagraphText(Paragraph paragraph)
+    {
+        // Check if this paragraph contains any math elements
+        var hasMath = paragraph.Descendants<OoxmlMath.OfficeMath>().Any()
+                   || paragraph.Descendants<OoxmlMath.Paragraph>().Any();
+
+        if (!hasMath)
+            return paragraph.InnerText;
+
+        var sb = new StringBuilder();
+        foreach (var child in paragraph.ChildElements)
+        {
+            switch (child)
+            {
+                case OoxmlMath.Paragraph mathPara:
+                    foreach (var oMath in mathPara.Elements<OoxmlMath.OfficeMath>())
+                    {
+                        var latex = OoxmlMathConverter.ToLaTeX(oMath);
+                        if (!string.IsNullOrWhiteSpace(latex))
+                            sb.Append($"[math: {latex}]");
+                    }
+                    break;
+
+                case OoxmlMath.OfficeMath oMath:
+                    var inlineLatex = OoxmlMathConverter.ToLaTeX(oMath);
+                    if (!string.IsNullOrWhiteSpace(inlineLatex))
+                        sb.Append($"[math: {inlineLatex}]");
+                    break;
+
                 case Run run:
                     sb.Append(run.InnerText);
                     break;
 
-                // Other elements (bookmarks, etc.) — extract inner text
                 default:
                     var text = child.InnerText;
                     if (!string.IsNullOrEmpty(text))

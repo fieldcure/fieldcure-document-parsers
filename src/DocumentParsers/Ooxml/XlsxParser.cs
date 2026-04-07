@@ -15,11 +15,34 @@ public sealed class XlsxParser : IDocumentParser
 
     /// <inheritdoc />
     public string ExtractText(byte[] data)
+        => ExtractText(data, ExtractionOptions.Default);
+
+    /// <summary>
+    /// Extracts text from XLSX bytes with configurable extraction options.
+    /// </summary>
+    public string ExtractText(byte[] data, ExtractionOptions options)
     {
         using var stream = new MemoryStream(data);
         using var doc = SpreadsheetDocument.Open(stream, false);
         var workbookPart = doc.WorkbookPart;
         if (workbookPart is null) return "";
+
+        var sb = new StringBuilder();
+
+        // Metadata — YAML front matter
+        if (options.IncludeMetadata)
+        {
+            var props = doc.PackageProperties;
+            var yaml = MetadataFormatter.FormatYamlFrontMatter(
+                title: props.Title,
+                author: props.Creator,
+                created: props.Created,
+                modified: props.Modified,
+                subject: props.Subject,
+                keywords: props.Keywords,
+                description: props.Description);
+            sb.Append(yaml);
+        }
 
         // Load shared string table for cell value resolution
         var sst = workbookPart.SharedStringTablePart?.SharedStringTable;
@@ -28,9 +51,7 @@ public sealed class XlsxParser : IDocumentParser
             .ToArray() ?? [];
 
         var sheets = workbookPart.Workbook?.Sheets?.Elements<Sheet>().ToList();
-        if (sheets is null or { Count: 0 }) return "";
-
-        var sb = new StringBuilder();
+        if (sheets is null or { Count: 0 }) return sb.ToString().TrimEnd();
 
         foreach (var sheet in sheets)
         {

@@ -16,12 +16,27 @@ public sealed class HwpxParser : IDocumentParser
 
     /// <inheritdoc />
     public string ExtractText(byte[] data)
+        => ExtractText(data, ExtractionOptions.Default);
+
+    /// <summary>
+    /// Extracts structured Markdown from HWPX bytes with configurable extraction options.
+    /// </summary>
+    public string ExtractText(byte[] data, ExtractionOptions options)
     {
         using var stream = new MemoryStream(data);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
 
         // Parse header.xml to build heading level maps
         var (paraPrHeadingMap, styleHeadingMap) = BuildHeadingMaps(archive);
+
+        var sb = new StringBuilder();
+
+        // Metadata — YAML front matter from content.hpf Dublin Core
+        if (options.IncludeMetadata)
+        {
+            var yaml = ExtractMetadata(archive);
+            sb.Append(yaml);
+        }
 
         // Collect section entries sorted by name (section0.xml, section1.xml, ...)
         var sectionEntries = archive.Entries
@@ -30,9 +45,11 @@ public sealed class HwpxParser : IDocumentParser
             .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (sectionEntries.Count == 0) return "";
+        if (sectionEntries.Count == 0) return sb.ToString().TrimEnd();
 
-        var sb = new StringBuilder();
+        var footnoteCollector = new FootnoteCollector();
+        var footnoteCounter = 0;
+        var endnoteCounter = 0;
 
         foreach (var entry in sectionEntries)
         {
@@ -44,10 +61,122 @@ public sealed class HwpxParser : IDocumentParser
                 .Where(e => e.Name.LocalName == "sec");
 
             foreach (var sec in sectionElements)
-                ProcessBlockElements(sec, sb, paraPrHeadingMap, styleHeadingMap);
+            {
+                // Headers — before section body
+                if (options.IncludeHeaders)
+                {
+                    var headerText = ExtractHeaderFooterFromSection(sec, isHeader: true);
+                    if (!string.IsNullOrEmpty(headerText))
+                    {
+                        if (sb.Length > 0) sb.AppendLine();
+                        sb.Append(headerText);
+                        sb.AppendLine();
+                    }
+                }
+
+                ProcessBlockElements(sec, sb, paraPrHeadingMap, styleHeadingMap,
+                    options, footnoteCollector, ref footnoteCounter, ref endnoteCounter);
+
+                // Footers — after section body
+                if (options.IncludeFooters)
+                {
+                    var footerText = ExtractHeaderFooterFromSection(sec, isHeader: false);
+                    if (!string.IsNullOrEmpty(footerText))
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine();
+                        sb.Append(footerText);
+                    }
+                }
+            }
 
             if (!sectionElements.Any() && xdoc.Root is not null)
-                ProcessBlockElements(xdoc.Root, sb, paraPrHeadingMap, styleHeadingMap);
+                ProcessBlockElements(xdoc.Root, sb, paraPrHeadingMap, styleHeadingMap,
+                    options, footnoteCollector, ref footnoteCounter, ref endnoteCounter);
+        }
+
+        // Footnotes and endnotes sections at end
+        if (options.IncludeFootnotes || options.IncludeEndnotes)
+        {
+            var notesSections = footnoteCollector.RenderAll();
+            if (!string.IsNullOrEmpty(notesSections))
+                sb.Append(notesSections);
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Extracts metadata from content.hpf Dublin Core elements.
+    /// </summary>
+    private static string ExtractMetadata(ZipArchive archive)
+    {
+        var hpfEntry = archive.Entries
+            .FirstOrDefault(e => e.FullName.Equals("Contents/content.hpf", StringComparison.OrdinalIgnoreCase));
+        if (hpfEntry is null) return "";
+
+        using var entryStream = hpfEntry.Open();
+        var xdoc = XDocument.Load(entryStream);
+
+        string? title = null, creator = null, subject = null, description = null, date = null;
+
+        foreach (var el in xdoc.Descendants())
+        {
+            if (el.Name.LocalName == "title" && string.IsNullOrEmpty(title))
+                title = el.Value;
+            else if (el.Name.LocalName == "creator" && string.IsNullOrEmpty(creator))
+                creator = el.Value;
+            else if (el.Name.LocalName == "subject" && string.IsNullOrEmpty(subject))
+                subject = el.Value;
+            else if (el.Name.LocalName == "description" && string.IsNullOrEmpty(description))
+                description = el.Value;
+            else if (el.Name.LocalName == "date" && string.IsNullOrEmpty(date))
+                date = el.Value;
+        }
+
+        // Parse date if present
+        DateTime? created = null;
+        if (date is not null && DateTime.TryParse(date, out var parsedDate))
+            created = parsedDate;
+
+        return MetadataFormatter.FormatYamlFrontMatter(
+            title: title,
+            author: creator,
+            created: created,
+            subject: subject,
+            description: description);
+    }
+
+    /// <summary>
+    /// Extracts header or footer text from a section's hp:headerFooter element.
+    /// </summary>
+    private static string ExtractHeaderFooterFromSection(XElement section, bool isHeader)
+    {
+        var headerFooterElements = section.Elements()
+            .Where(e => e.Name.LocalName == "headerFooter");
+
+        var sb = new StringBuilder();
+        foreach (var hf in headerFooterElements)
+        {
+            var targetLocalName = isHeader ? "header" : "footer";
+            var label = isHeader ? "[Header]:" : "[Footer]:";
+
+            foreach (var part in hf.Elements().Where(e => e.Name.LocalName == targetLocalName))
+            {
+                var paragraphs = part.Descendants()
+                    .Where(e => e.Name.LocalName == "p");
+
+                var texts = new List<string>();
+                foreach (var p in paragraphs)
+                {
+                    var text = ExtractParagraphText(p);
+                    if (!string.IsNullOrWhiteSpace(text))
+                        texts.Add(text);
+                }
+
+                if (texts.Count > 0)
+                    sb.AppendLine($"> **{label}** {string.Join(" ", texts)}");
+            }
         }
 
         return sb.ToString().TrimEnd();
@@ -55,8 +184,8 @@ public sealed class HwpxParser : IDocumentParser
 
     /// <summary>
     /// Parses header.xml to build two mappings for heading level resolution:
-    /// paraPrHeadingMap (paraPr id → heading level) and styleHeadingMap (style id → heading level).
-    /// A paragraph's heading level is resolved by styleIDRef first (via style → paraPrIDRef chain),
+    /// paraPrHeadingMap (paraPr id -> heading level) and styleHeadingMap (style id -> heading level).
+    /// A paragraph's heading level is resolved by styleIDRef first (via style -> paraPrIDRef chain),
     /// then by direct paraPrIDRef fallback.
     /// </summary>
     private static (Dictionary<int, int> paraPrMap, Dictionary<int, int> styleMap) BuildHeadingMaps(ZipArchive archive)
@@ -71,7 +200,7 @@ public sealed class HwpxParser : IDocumentParser
         using var entryStream = headerEntry.Open();
         var xdoc = XDocument.Load(entryStream);
 
-        // Step 1: Build paraPr id → heading level map
+        // Step 1: Build paraPr id -> heading level map
         var paraPrElements = xdoc.Descendants()
             .Where(e => e.Name.LocalName == "paraPr");
 
@@ -95,7 +224,7 @@ public sealed class HwpxParser : IDocumentParser
                 paraPrMap[id] = level + 1;
         }
 
-        // Step 2: Build style id → heading level map (style → paraPrIDRef → paraPr heading)
+        // Step 2: Build style id -> heading level map (style -> paraPrIDRef -> paraPr heading)
         var styleElements = xdoc.Descendants()
             .Where(e => e.Name.LocalName == "style");
 
@@ -121,7 +250,9 @@ public sealed class HwpxParser : IDocumentParser
     /// </summary>
     private static void ProcessBlockElements(
         XElement parent, StringBuilder sb,
-        Dictionary<int, int> paraPrHeadingMap, Dictionary<int, int> styleHeadingMap)
+        Dictionary<int, int> paraPrHeadingMap, Dictionary<int, int> styleHeadingMap,
+        ExtractionOptions options, FootnoteCollector footnoteCollector,
+        ref int footnoteCounter, ref int endnoteCounter)
     {
         foreach (var child in parent.Elements())
         {
@@ -164,13 +295,27 @@ public sealed class HwpxParser : IDocumentParser
                 }
                 else
                 {
-                    // Simple paragraph: concatenate all hp:t text within runs
-                    var paraText = ExtractParagraphText(child);
+                    // Process paragraph with footnote/endnote/memo support
+                    var paraText = ExtractParagraphTextWithNotes(child, options, footnoteCollector,
+                        ref footnoteCounter, ref endnoteCounter);
+
+                    // Check for memos in this paragraph
+                    var memoText = "";
+                    if (options.IncludeComments)
+                        memoText = ExtractMemos(child);
+
                     if (!string.IsNullOrWhiteSpace(paraText))
                     {
                         if (sb.Length > 0) sb.AppendLine();
                         sb.Append(headingPrefix);
                         sb.Append(paraText);
+                    }
+
+                    if (!string.IsNullOrEmpty(memoText))
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine();
+                        sb.Append(memoText);
                     }
                 }
             }
@@ -187,7 +332,8 @@ public sealed class HwpxParser : IDocumentParser
             else if (localName is "sec" or "subList" or "cell" or "drawText")
             {
                 // Recurse into container elements that may hold paragraphs/tables
-                ProcessBlockElements(child, sb, paraPrHeadingMap, styleHeadingMap);
+                ProcessBlockElements(child, sb, paraPrHeadingMap, styleHeadingMap,
+                    options, footnoteCollector, ref footnoteCounter, ref endnoteCounter);
             }
         }
     }
@@ -200,7 +346,7 @@ public sealed class HwpxParser : IDocumentParser
         XElement paragraph,
         Dictionary<int, int> paraPrHeadingMap, Dictionary<int, int> styleHeadingMap)
     {
-        // Primary: resolve via styleIDRef → style → paraPrIDRef chain
+        // Primary: resolve via styleIDRef -> style -> paraPrIDRef chain
         var styleIdRefAttr = paragraph.Attribute("styleIDRef");
         if (styleIdRefAttr is not null
             && int.TryParse(styleIdRefAttr.Value, out var styleIdRef)
@@ -214,6 +360,128 @@ public sealed class HwpxParser : IDocumentParser
             return paraPrHeadingMap.GetValueOrDefault(paraPrIdRef);
 
         return 0;
+    }
+
+    /// <summary>
+    /// Extracts paragraph text with footnote/endnote inline markers.
+    /// </summary>
+    private static string ExtractParagraphTextWithNotes(
+        XElement paragraph, ExtractionOptions options,
+        FootnoteCollector footnoteCollector,
+        ref int footnoteCounter, ref int endnoteCounter)
+    {
+        var hasFootnotes = options.IncludeFootnotes && paragraph.Descendants()
+            .Any(e => e.Name.LocalName == "footnote");
+        var hasEndnotes = options.IncludeEndnotes && paragraph.Descendants()
+            .Any(e => e.Name.LocalName == "endnote");
+
+        if (!hasFootnotes && !hasEndnotes)
+            return ExtractParagraphText(paragraph);
+
+        // Slow path: process runs to interleave text with footnote/endnote markers
+        var sb = new StringBuilder();
+        ExtractWithNotes(paragraph, sb, options, footnoteCollector,
+            ref footnoteCounter, ref endnoteCounter);
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Recursively extracts text, equations, and footnote/endnote markers.
+    /// </summary>
+    private static void ExtractWithNotes(
+        XElement element, StringBuilder sb,
+        ExtractionOptions options, FootnoteCollector footnoteCollector,
+        ref int footnoteCounter, ref int endnoteCounter)
+    {
+        foreach (var child in element.Elements())
+        {
+            var localName = child.Name.LocalName;
+
+            if (localName == "footnote" && options.IncludeFootnotes)
+            {
+                footnoteCounter++;
+                var subList = child.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
+                var content = "";
+                if (subList is not null)
+                {
+                    var paragraphs = subList.Descendants()
+                        .Where(e => e.Name.LocalName == "p")
+                        .Select(ExtractParagraphText)
+                        .Where(t => !string.IsNullOrWhiteSpace(t));
+                    content = string.Join(" ", paragraphs);
+                }
+                sb.Append(footnoteCollector.AddFootnote(footnoteCounter, content));
+            }
+            else if (localName == "endnote" && options.IncludeEndnotes)
+            {
+                endnoteCounter++;
+                var subList = child.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
+                var content = "";
+                if (subList is not null)
+                {
+                    var paragraphs = subList.Descendants()
+                        .Where(e => e.Name.LocalName == "p")
+                        .Select(ExtractParagraphText)
+                        .Where(t => !string.IsNullOrWhiteSpace(t));
+                    content = string.Join(" ", paragraphs);
+                }
+                sb.Append(footnoteCollector.AddEndnote(endnoteCounter, content));
+            }
+            else if (localName == "equation")
+            {
+                var script = child.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "script");
+                if (script is not null)
+                {
+                    var latex = HancomMathNormalizer.ToLaTeX(script.Value);
+                    if (!string.IsNullOrWhiteSpace(latex))
+                        sb.Append($"[math: {latex}]");
+                }
+            }
+            else if (localName == "t")
+            {
+                sb.Append(child.Value);
+            }
+            else if (localName is "tbl" or "memo")
+            {
+                // Skip tables and memos — handled separately
+            }
+            else
+            {
+                ExtractWithNotes(child, sb, options, footnoteCollector,
+                    ref footnoteCounter, ref endnoteCounter);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts memo elements from a paragraph as comment blockquotes.
+    /// </summary>
+    private static string ExtractMemos(XElement paragraph)
+    {
+        var memos = paragraph.Descendants()
+            .Where(e => e.Name.LocalName == "memo")
+            .ToList();
+
+        if (memos.Count == 0) return "";
+
+        var sb = new StringBuilder();
+        foreach (var memo in memos)
+        {
+            var textParts = memo.Descendants()
+                .Where(e => e.Name.LocalName == "t")
+                .Select(e => e.Value)
+                .Where(t => !string.IsNullOrWhiteSpace(t));
+            var text = string.Join(" ", textParts);
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                if (sb.Length > 0) sb.AppendLine();
+                sb.Append($"> **[Comment]:** {text}");
+            }
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>

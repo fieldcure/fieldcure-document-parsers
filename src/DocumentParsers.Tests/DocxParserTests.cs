@@ -105,7 +105,8 @@ public class DocxParserTests
     [TestMethod]
     public void EmptyDocument_ReturnsEmptyOrWhitespace()
     {
-        var text = ReadText("empty.docx");
+        var data = File.ReadAllBytes(Path.Combine(TestDataDir, "empty.docx"));
+        var text = _parser.ExtractText(data, new ExtractionOptions { IncludeMetadata = false });
         Assert.IsTrue(string.IsNullOrWhiteSpace(text), $"Expected empty, got: '{text}'");
     }
 

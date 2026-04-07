@@ -102,7 +102,8 @@ public class HwpxParserTests
     [TestMethod]
     public void EmptyDocument_ReturnsEmptyOrWhitespace()
     {
-        var text = ReadText("empty.hwpx");
+        var data = File.ReadAllBytes(Path.Combine(TestDataDir, "empty.hwpx"));
+        var text = _parser.ExtractText(data, new ExtractionOptions { IncludeMetadata = false });
         Assert.IsTrue(string.IsNullOrWhiteSpace(text), $"Expected empty, got: '{text}'");
     }
 
