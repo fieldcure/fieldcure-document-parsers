@@ -1,5 +1,25 @@
 # Release Notes — FieldCure.DocumentParsers
 
+## [1.1.0] - 2026-04-07
+
+### Added
+- `HtmlParser` — HTML/HTM text extraction via SmartReader (content extraction) + ReverseMarkdown (HTML → Markdown conversion)
+- **Metadata** — YAML front matter output (`title`, `author`, `created`, `modified`, `subject`, `keywords`, `description`) for DOCX, HWPX, PPTX, XLSX
+- **Footnotes / Endnotes** — inline `[^N]` / `[^enN]` references with `## Footnotes` / `## Endnotes` definition sections (DOCX, HWPX)
+- **Comments / Memos** — inline blockquote `> **[Comment — author]:**` format (DOCX comments, HWPX memos)
+- **Headers / Footers** — blockquote `> **[Header]:**` / `> **[Footer]:**` with first-page/even-page variants (DOCX, HWPX)
+- `ExtractionOptions` class — opt-out control for metadata, headers, footers, footnotes, endnotes, comments
+- `MetadataFormatter` internal utility — `PackageProperties` / Dublin Core → YAML front matter
+- `FootnoteCollector` internal utility — footnote/endnote collection and markdown rendering
+
+### Changed
+- HWPX element names corrected to camelCase (`footNote`, `endNote`) matching actual Hancom Office output
+- HWPX memo detection changed from `hp:memo` to `hp:fieldBegin[type="MEMO"]` with Author/CreateDateTime parameter extraction
+- HWPX parser now processes `hp:ctrl` wrappers recursively
+- All HWPX element name comparisons are now case-insensitive (`StringComparison.OrdinalIgnoreCase`)
+- Footnote/endnote/memo inner text excluded from body output via triple-layer exclusion filter
+- Test count increased from 70 to 149 (79 new tests including 21 real-file integration tests)
+
 ## [1.0.0] - 2026-04-06
 
 ### Added
