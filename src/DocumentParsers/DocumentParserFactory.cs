@@ -20,6 +20,7 @@ public static class DocumentParserFactory
             new HwpxParser(),
             new XlsxParser(),
             new PptxParser(),
+            new HtmlParser(),
         };
 
         foreach (var p in builtIn)
