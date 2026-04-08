@@ -7,17 +7,20 @@
     <File Path="README.md" />
     <File Path="RELEASENOTES.DocumentParsers.md" />
     <File Path="RELEASENOTES.DocumentParsers.Pdf.md" />
+    <File Path="RELEASENOTES.DocumentParsers.Pdf.Ocr.md" />
   </Folder>
 
   <Folder Name="/src/">
     <Project Path="src/DocumentParsers/DocumentParsers.csproj" />
     <Project Path="src/DocumentParsers.Pdf/DocumentParsers.Pdf.csproj" />
+    <Project Path="src/DocumentParsers.Pdf.Ocr/DocumentParsers.Pdf.Ocr.csproj" />
     <Project Path="src/DocumentParsers.Cli/DocumentParsers.Cli.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
     <Project Path="src/DocumentParsers.Tests/DocumentParsers.Tests.csproj" />
     <Project Path="src/DocumentParsers.Pdf.Tests/DocumentParsers.Pdf.Tests.csproj" />
+    <Project Path="src/DocumentParsers.Pdf.Ocr.Tests/DocumentParsers.Pdf.Ocr.Tests.csproj" />
   </Folder>
 
 </Solution>
