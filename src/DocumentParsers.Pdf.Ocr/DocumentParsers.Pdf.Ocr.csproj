@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <AssemblyName>FieldCure.DocumentParsers.Pdf.Ocr</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Pdf.Ocr</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

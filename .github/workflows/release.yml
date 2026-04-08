@@ -15,34 +15,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Parse commit message
-        id: parse
+      - name: Create releases
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           MESSAGE="${{ github.event.head_commit.message }}"
-          # "Release vX.X.X" (all) or "Release <Name> vX.X.X" (single)
+
+          # "Release vX.X.X" — all packages with same version
           if echo "$MESSAGE" | grep -qE '^Release v[0-9]'; then
             VERSION=$(echo "$MESSAGE" | sed -n 's/Release v\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-            echo "name=" >> "$GITHUB_OUTPUT"
-            echo "mode=all" >> "$GITHUB_OUTPUT"
-          else
-            PACKAGE=$(echo "$MESSAGE" | sed -n 's/Release \(.*\) v[0-9].*/\1/p')
-            VERSION=$(echo "$MESSAGE" | sed -n 's/.*v\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
-            TAG_NAME=$(echo "$PACKAGE" | tr '[:upper:]' '[:lower:]')
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "tag=${TAG_NAME}-v${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "name=$PACKAGE" >> "$GITHUB_OUTPUT"
-            echo "mode=single" >> "$GITHUB_OUTPUT"
-          fi
+            TAG="v${VERSION}"
 
-      - name: Build release body
-        shell: bash
-        run: |
-          MODE="${{ steps.parse.outputs.mode }}"
-          NAME="${{ steps.parse.outputs.name }}"
-          if [ "$MODE" = "all" ]; then
             {
               echo "# DocumentParsers"
               echo ""
@@ -53,15 +37,36 @@ jobs:
               echo "# DocumentParsers.Pdf"
               echo ""
               cat RELEASENOTES.DocumentParsers.Pdf.md
+              echo ""
+              echo "---"
+              echo ""
+              echo "# DocumentParsers.Pdf.Ocr"
+              echo ""
+              cat RELEASENOTES.DocumentParsers.Pdf.Ocr.md
             } > RELEASE_BODY.md
-          else
-            cp "RELEASENOTES.${NAME}.md" RELEASE_BODY.md
-          fi
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.parse.outputs.tag }}
-          name: ${{ steps.parse.outputs.name && format('{0} v{1}', steps.parse.outputs.name, steps.parse.outputs.version) || format('v{0}', steps.parse.outputs.version) }}
-          body_path: RELEASE_BODY.md
-          generate_release_notes: false
+            gh release create "$TAG" \
+              --title "v${VERSION}" \
+              --notes-file RELEASE_BODY.md
+          else
+            # "Release Name1 vX.X.X [Name2 vX.X.X ...]"
+            # Extract all "Name vX.X.X" pairs
+            PAIRS=$(echo "$MESSAGE" | grep -oE '[A-Za-z][A-Za-z0-9.]*\s+v[0-9]+\.[0-9]+\.[0-9]+')
+
+            echo "$PAIRS" | while IFS= read -r pair; do
+              NAME=$(echo "$pair" | awk '{print $1}')
+              VERSION=$(echo "$pair" | sed 's/.*v//')
+              TAG="$(echo "$NAME" | tr '[:upper:]' '[:lower:]')-v${VERSION}"
+
+              NOTES_FILE="RELEASENOTES.${NAME}.md"
+              if [ ! -f "$NOTES_FILE" ]; then
+                echo "::warning::$NOTES_FILE not found, skipping $NAME"
+                continue
+              fi
+
+              echo "Creating release: $NAME v$VERSION (tag: $TAG)"
+              gh release create "$TAG" \
+                --title "${NAME} v${VERSION}" \
+                --notes-file "$NOTES_FILE"
+            done
+          fi

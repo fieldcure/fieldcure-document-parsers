@@ -1,5 +1,16 @@
 # Release Notes — FieldCure.DocumentParsers.Pdf
 
+## [1.1.0] - 2026-04-08
+
+### Added
+- `IOcrEngine` interface for pluggable OCR engines
+- `PdfParser(IOcrEngine)` constructor overload with OCR fallback for scanned pages
+- `AddPdfSupport(IOcrEngine)` factory registration overload
+- Pages with < 5% meaningful text are automatically rendered at 300 DPI and sent to OCR
+
+### Note
+Backward compatible — existing parameterless constructor and `AddPdfSupport()` unchanged.
+
 ## [1.0.0] - 2026-04-06
 
 ### Note

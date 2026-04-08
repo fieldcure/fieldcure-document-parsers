@@ -2,6 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers)](https://www.nuget.org/packages/FieldCure.DocumentParsers)
 [![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Pdf)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf)
+[![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Pdf.Ocr)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf.Ocr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Lightweight document-to-text extraction library for .NET.
@@ -23,8 +24,9 @@ with heading detection and table support — designed for LLM/RAG pipelines.
 |---------|-------------|:------------:|
 | `FieldCure.DocumentParsers` | DOCX, HWPX, XLSX, PPTX, HTML | DocumentFormat.OpenXml, SmartReader, ReverseMarkdown |
 | `FieldCure.DocumentParsers.Pdf` | PDF text + images | PdfPig, PDFtoImage |
+| `FieldCure.DocumentParsers.Pdf.Ocr` | Tesseract OCR for scanned PDFs | Tesseract (eng + kor) |
 
-PDF is a separate package to keep the core package lightweight (no native binaries).
+PDF and OCR are separate packages to keep the core lightweight (no native binaries).
 
 ## Installation
 
@@ -34,6 +36,9 @@ dotnet add package FieldCure.DocumentParsers
 
 # PDF support (optional)
 dotnet add package FieldCure.DocumentParsers.Pdf
+
+# PDF + OCR for scanned PDFs (optional)
+dotnet add package FieldCure.DocumentParsers.Pdf.Ocr
 ```
 
 ## Quick Start
@@ -75,6 +80,17 @@ DocumentParserFactoryExtensions.AddPdfSupport();
 // Extract PDF pages as images
 var pdfParser = (IMediaDocumentParser)DocumentParserFactory.GetParser(".pdf")!;
 var images = pdfParser.ExtractImages(File.ReadAllBytes("document.pdf"), dpi: 150);
+```
+
+```csharp
+using FieldCure.DocumentParsers.Pdf.Ocr;
+
+// Register PDF with OCR fallback for scanned PDFs (call once at startup)
+using var ocrEngine = DocumentParserFactoryOcrExtensions.AddPdfOcrSupport();
+
+// Scanned pages are automatically OCR'd when text extraction yields no content
+var parser = DocumentParserFactory.GetParser(".pdf")!;
+var text = parser.ExtractText(File.ReadAllBytes("scanned.pdf"));
 ```
 
 ## Custom Parser
@@ -178,24 +194,28 @@ All parsers convert tables to markdown format for LLM comprehension:
 
 | Supported | Not Yet Supported |
 |-----------|-------------------|
-| Text extraction (text-based PDF) | Scanned PDF OCR |
-| Page image rendering | Form field extraction |
-| Multi-page documents | Digital signature info |
-| Unicode text | PDF/A validation |
+| Text extraction (text-based PDF) | Form field extraction |
+| Page image rendering | Digital signature info |
+| Multi-page documents | PDF/A validation |
+| Unicode text | |
+| OCR fallback for scanned PDFs (Pdf.Ocr) | |
+| English + Korean OCR (tessdata_fast) | |
 
 ## Repository Structure
 
 ```
 src/
-├── DocumentParsers/            FieldCure.DocumentParsers (net8.0)
-│   ├── Ooxml/                  DocxParser, PptxParser, XlsxParser
-│   ├── Hwpx/                   HwpxParser
-│   └── Html/                   HtmlParser
-├── DocumentParsers.Pdf/        FieldCure.DocumentParsers.Pdf (net8.0)
-├── DocumentParsers.Cli/        Console tool for manual output inspection
-├── DocumentParsers.Tests/      MSTest — 138 tests
-└── DocumentParsers.Pdf.Tests/  MSTest — 11 tests
-                                Total: 149 tests
+├── DocumentParsers/                FieldCure.DocumentParsers (net8.0)
+│   ├── Ooxml/                      DocxParser, PptxParser, XlsxParser
+│   ├── Hwpx/                       HwpxParser
+│   └── Html/                       HtmlParser
+├── DocumentParsers.Pdf/            FieldCure.DocumentParsers.Pdf (net8.0)
+├── DocumentParsers.Pdf.Ocr/        FieldCure.DocumentParsers.Pdf.Ocr (net8.0)
+├── DocumentParsers.Cli/            Console tool for manual output inspection
+├── DocumentParsers.Tests/          MSTest — 138 tests
+├── DocumentParsers.Pdf.Tests/      MSTest — 11 tests
+└── DocumentParsers.Pdf.Ocr.Tests/  MSTest — 19 tests
+                                    Total: 168 tests
 ```
 
 ## Build & Test
@@ -213,6 +233,7 @@ Part of the [AssistStudio ecosystem](https://github.com/fieldcure/fieldcure-assi
 
 - [FieldCure.DocumentParsers](RELEASENOTES.DocumentParsers.md)
 - [FieldCure.DocumentParsers.Pdf](RELEASENOTES.DocumentParsers.Pdf.md)
+- [FieldCure.DocumentParsers.Pdf.Ocr](RELEASENOTES.DocumentParsers.Pdf.Ocr.md)
 
 ## License
 
