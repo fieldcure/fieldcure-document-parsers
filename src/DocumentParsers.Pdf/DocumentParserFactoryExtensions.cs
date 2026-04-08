@@ -11,4 +11,12 @@ public static class DocumentParserFactoryExtensions
     /// </summary>
     public static void AddPdfSupport()
         => DocumentParserFactory.Register(new PdfParser());
+
+    /// <summary>
+    /// Registers PDF parser with OCR fallback support.
+    /// When text extraction yields no content, pages are rendered and processed via OCR.
+    /// </summary>
+    /// <param name="ocrEngine">OCR engine for scanned page fallback.</param>
+    public static void AddPdfSupport(IOcrEngine ocrEngine)
+        => DocumentParserFactory.Register(new PdfParser(ocrEngine));
 }
