@@ -207,7 +207,7 @@ dotnet test
 
 ## See Also
 
-Part of the [AssistStudio ecosystem](https://github.com/fieldcure/fieldcure-assiststudio#ecosystem).
+Part of the [AssistStudio ecosystem](https://github.com/fieldcure/fieldcure-assiststudio#packages).
 
 ## Release Notes
 
