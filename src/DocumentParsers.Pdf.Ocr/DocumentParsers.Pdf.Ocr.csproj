@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <Version>0.1.0</Version>
+    <AssemblyName>FieldCure.DocumentParsers.Pdf.Ocr</AssemblyName>
+    <RootNamespace>FieldCure.DocumentParsers.Pdf.Ocr</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>FieldCure.DocumentParsers.Pdf.Ocr</PackageId>
+    <Description>Tesseract OCR fallback for scanned PDFs in FieldCure.DocumentParsers.Pdf</Description>
+    <Authors>Jong Hyun Kim</Authors>
+    <Company>Fieldcure Co., Ltd.</Company>
+    <Copyright>Copyright (c) 2026 Fieldcure Co., Ltd.</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/fieldcure/fieldcure-document-parsers</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>document;parser;pdf;ocr;tesseract;text-extraction;rag</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\..\..\RELEASENOTES.DocumentParsers.Pdf.Ocr.md'))</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\DocumentParsers\icon.png" Pack="true" PackagePath="" Link="icon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="tessdata\*.traineddata" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DocumentParsers.Pdf\DocumentParsers.Pdf.csproj" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+  </ItemGroup>
+
+</Project>
