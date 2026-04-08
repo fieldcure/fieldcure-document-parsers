@@ -1,4 +1,5 @@
 using System.Text;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace FieldCure.DocumentParsers.Pdf;
 
@@ -27,7 +28,7 @@ public sealed class PdfParser : IMediaDocumentParser
             if (sb.Length > 0) { sb.AppendLine(); sb.AppendLine(); }
             sb.AppendLine($"## Page {pageNumber}");
             sb.AppendLine();
-            sb.Append(page.Text);
+            sb.Append(ContentOrderTextExtractor.GetText(page));
         }
 
         return sb.ToString().TrimEnd();
