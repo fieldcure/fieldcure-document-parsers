@@ -1,0 +1,25 @@
+<Project>
+  <!-- Tesseract native DLLs — filenames are version-specific.
+       When upgrading Tesseract, update both this file AND the csproj <ItemGroup>
+       (e.g., tesseract50.dll → tesseract53.dll, leptonica version may also change). -->
+
+  <!-- Build time: copy native DLLs to output x64/ -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\x64\leptonica-1.82.0.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="x64\leptonica-1.82.0.dll" />
+    <None Include="$(MSBuildThisFileDirectory)..\x64\tesseract50.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="x64\tesseract50.dll" />
+  </ItemGroup>
+
+  <!-- PackAsTool: include native DLLs in tool package -->
+  <ItemGroup Condition="'$(PackAsTool)' == 'true'">
+    <None Update="$(MSBuildThisFileDirectory)..\x64\leptonica-1.82.0.dll"
+          Pack="true"
+          PackagePath="tools/$(TargetFramework)/any/x64/" />
+    <None Update="$(MSBuildThisFileDirectory)..\x64\tesseract50.dll"
+          Pack="true"
+          PackagePath="tools/$(TargetFramework)/any/x64/" />
+  </ItemGroup>
+</Project>

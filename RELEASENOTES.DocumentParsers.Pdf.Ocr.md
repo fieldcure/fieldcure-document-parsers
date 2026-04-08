@@ -1,5 +1,10 @@
 # Release Notes — FieldCure.DocumentParsers.Pdf.Ocr
 
+## [1.0.1] - 2026-04-08
+
+### Fixed
+- Tesseract native DLLs (`leptonica-1.82.0.dll`, `tesseract50.dll`) now included in NuGet package with `build/` and `buildTransitive/` targets, fixing `DllNotFoundException` in `PackAsTool` consumers (e.g., MCP servers)
+
 ## [1.0.0] - 2026-04-08
 
 ### Added

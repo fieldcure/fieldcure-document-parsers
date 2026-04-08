@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <AssemblyName>FieldCure.DocumentParsers.Pdf.Ocr</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Pdf.Ocr</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -37,7 +37,23 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DocumentParsers.Pdf\DocumentParsers.Pdf.csproj" />
-    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embed Tesseract native DLLs into this package for redistribution.
+         If upgrading Tesseract, update filenames here AND in build/*.targets
+         (e.g., tesseract50.dll → tesseract53.dll, leptonica version may also change). -->
+    <None Include="$(PkgTesseract)\x64\leptonica-1.82.0.dll"
+          Pack="true" PackagePath="x64/" Visible="false" />
+    <None Include="$(PkgTesseract)\x64\tesseract50.dll"
+          Pack="true" PackagePath="x64/" Visible="false" />
+
+    <!-- .targets for both direct and transitive consumers -->
+    <None Include="build\FieldCure.DocumentParsers.Pdf.Ocr.targets"
+          Pack="true" PackagePath="build/" />
+    <None Include="build\FieldCure.DocumentParsers.Pdf.Ocr.targets"
+          Pack="true" PackagePath="buildTransitive/" />
   </ItemGroup>
 
 </Project>
