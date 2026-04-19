@@ -126,6 +126,7 @@ internal static partial class HancomMathNormalizer
             ["ANGLE"] = @"\angle",   ["MSANGLE"] = @"\measuredangle",
             ["SANGLE"] = @"\sphericalangle",
             ["VDASH"] = @"\vdash",   ["DASHV"] = @"\dashv",
+            ["HLEFT"] = @"\dashv",   // spec §1.2.4.6 pair: VDASH=⊢ / HLEFT=⊣
             ["BOT"] = @"\bot",       ["TOP"] = @"\top",
             ["MODELS"] = @"\models",
             ["CDOTS"] = @"\cdots",   ["cdots"] = @"\cdots",
@@ -288,6 +289,13 @@ internal static partial class HancomMathNormalizer
             ["bar"] = "HULKBAR",         ["hat"] = "HULKHAT",
             ["check"] = "HULKCHECK",     ["arch"] = "HULKARCH",
             ["tilde"] = "HULKTILDE",     ["BOX"] = "HULKBOX",
+            ["box"] = "HULKBOX",
+            // pile/lpile/rpile: spec §1.2 vertical stack (centre/left/right).
+            // All three collapse to \begin{matrix} — LaTeX's default matrix is
+            // centred so lpile/rpile alignment distinction is lost but content
+            // is preserved (acceptable for LLM extraction target).
+            ["pile"] = "HULKPILE",       ["lpile"] = "HULKPILE",
+            ["rpile"] = "HULKPILE",
             ["OVERBRACE"] = "HULKOVERBRACE",
             ["UNDERBRACE"] = "HULKUNDERBRACE",
         };
@@ -319,6 +327,7 @@ internal static partial class HancomMathNormalizer
             ["HULKBMATRIX"] = (@"\begin{bmatrix}", @"\end{bmatrix}", true),
             ["HULKDMATRIX"] = (@"\begin{vmatrix}", @"\end{vmatrix}", true),
             ["HULKCASE"]    = (@"\begin{cases}",   @"\end{cases}",   true),
+            ["HULKPILE"]    = (@"\begin{matrix}",  @"\end{matrix}",  true),
             ["HULKEQALIGN"] = (@"\eqalign{",       "}",              false),
         };
 
@@ -702,12 +711,18 @@ internal static partial class HancomMathNormalizer
 
                     if (removeOuter)
                     {
-                        // Try to consume the surrounding { } group (HML convention)
+                        // Try to consume a surrounding { } group in HML convention
+                        // `{matrix{rows}}`. Only whitespace is allowed between the
+                        // outer `{` and the HULK marker — otherwise the nearest `{`
+                        // going back would be an unrelated earlier group (e.g. the
+                        // `{matrix}` of a prior \begin{matrix} emitted by this very
+                        // pass), and consuming it would leave the HULK marker in
+                        // place → infinite loop.
                         try
                         {
                             var p = cursor - 1;
-                            while (p >= 0 && s[p] != '{') p--;
-                            if (p >= 0)
+                            while (p >= 0 && char.IsWhiteSpace(s[p])) p--;
+                            if (p >= 0 && s[p] == '{')
                             {
                                 var (bStart, bEnd) = FindBracketsForward(s, p);
                                 s = s[..bStart] + begin + inner + end + s[bEnd..];

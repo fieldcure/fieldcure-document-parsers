@@ -1,4 +1,4 @@
-namespace FieldCure.DocumentParsers.Tests;
+﻿namespace FieldCure.DocumentParsers.Tests;
 
 /// <summary>
 /// Snapshot tests for <see cref="HancomMathNormalizer.ToLaTeX"/>.
@@ -123,9 +123,10 @@ public class HancomMathNormalizerTests
         DisplayName = "Spec18_Arrows_OK")]
     [DataRow(
         "cdots, LDOTS, VDOTS,\nDDOTS, TRIANGLE, TRIANGLED,\nANGLE, MSANGLE, SANGLE,\nRTANGLE, VDASH, HLEFT,\nBOT, TOP, MODELS,\nLAPLACE, CENTIGRADE, FAHRENHEIT,\nLSLANT, RSLANT, att,\nhund, thou, well,\nbase, benzene",
-        // PARTIAL: HLEFT, att, hund, thou, well, base, benzene unmapped.
-        // These are obscure/uncommon symbols; defer until observed in real docs.
-        @"\cdots , \ldots , \vdots , \ddots , \triangle , \triangledown , \angle , \measuredangle , \sphericalangle , \sphericalangle , \vdash , HLEFT , \bot , \top , \models , \mathcal{L} , ^{\circ}C , ^{\circ}F , \diagup , \diagdown , att , hund , thou , well , base , benzene",
+        // PARTIAL: att, hund, thou, well, base, benzene unmapped (obscure per
+        // spec §1.2.4.6 기타 기호 — ※/‰/‱/♯/△-variant/⬡ without direct LaTeX
+        // primitives). Defer until observed in real docs.
+        @"\cdots , \ldots , \vdots , \ddots , \triangle , \triangledown , \angle , \measuredangle , \sphericalangle , \sphericalangle , \vdash , \dashv , \bot , \top , \models , \mathcal{L} , ^{\circ}C , ^{\circ}F , \diagup , \diagdown , att , hund , thou , well , base , benzene",
         DisplayName = "Spec19_MiscSymbols_MostlyOK")]
     [DataRow(
         "sinh(x), cosh(x), arcsin(x), exp(x), \nmax(x,y), min(x,y),\ndet(A),\ngcd(x, y, z), mod(x, y)",
@@ -133,8 +134,8 @@ public class HancomMathNormalizerTests
         DisplayName = "Spec20_RomanFunctions_OK")]
     [DataRow(
         "vec {x}, dyad {x}, acute {x}, grave {x}, dot {x}, ddot {x}, under {x}, bar {x}, hat {x}, check {x}, arch {x}, tilde {x}, box {x+y}",
-        @"\overrightarrow{ x } , \overleftrightarrow{ x } , \acute{ x } , \grave{ x } , \dot{ x } , \ddot{ x } , \underline { x } , \overline{ x } , \widehat{ x } , \check{ x } , \overset{\frown}{ x } , \widetilde{ x } , box { x+y }",
-        DisplayName = "Spec21_Decorations")]
+        @"\overrightarrow{ x } , \overleftrightarrow{ x } , \acute{ x } , \grave{ x } , \dot{ x } , \ddot{ x } , \underline { x } , \overline{ x } , \widehat{ x } , \check{ x } , \overset{\frown}{ x } , \widetilde{ x } , \boxed{ x+y }",
+        DisplayName = "Spec21_Decorations_OK")]
     [DataRow("rm x, it x, bold x",
         // PARTIAL: rm/it/bold → \mathrm/\mathit/\mathbf. Without braces the
         // LaTeX output still only applies to one char (matches Hancom editor
@@ -179,9 +180,13 @@ public class HancomMathNormalizerTests
         @"\left ( x \right ) , \left [ x \right ] , \left \{ x \right \} , \left < x \right > , \left | x \right | # \left DLINE x \right DLINE , LCEIL x RCEIL , LFLOOR x RFLOOR , \overbrace{ x+y }^{ b } , \underbrace{ a }^{ x+y }",
         DisplayName = "Spec30_LeftRightDelims")]
     [DataRow("pile{ abcd#b }\n# lpile{abcd #b} \n# rpile{abcd #b}",
-        // BUG: pile/lpile/rpile unmapped. Now split correctly via ( ) padding.
-        "pile { abcd#b } # lpile { abcd #b } # rpile { abcd #b }",
-        DisplayName = "Spec31_Pile")]
+        // OK: all three pile variants now convert via HULKPILE → \begin{matrix}.
+        // The `#` separators between the three piles are outside any matrix
+        // body so they stay literal (not converted to `\\`).
+        // lpile/rpile alignment (left/right) is lost — LaTeX's matrix is always
+        // centred. Acceptable for LLM extraction.
+        @"\begin{matrix} abcd \\ b \end{matrix} # \begin{matrix} abcd \\ b \end{matrix} # \begin{matrix} abcd \\ b \end{matrix}",
+        DisplayName = "Spec31_Pile_OK")]
     [DataRow(
         "{matrix{a&b#c&d}}, {pmatrix{a&b#c&d}}, {dmatrix{a&b#c&d}}, {bmatrix{a&b#c&d}}",
         @"\begin{matrix} a & b \\ c & d \end{matrix} , \begin{pmatrix} a & b \\ c & d \end{pmatrix} , \begin{vmatrix} a & b \\ c & d \end{vmatrix} , \begin{bmatrix} a & b \\ c & d \end{bmatrix}",
