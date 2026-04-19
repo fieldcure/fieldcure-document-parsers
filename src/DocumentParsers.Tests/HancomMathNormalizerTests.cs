@@ -32,11 +32,10 @@ public class HancomMathNormalizerTests
         DisplayName = "Pattern2_DeMorgan_OK")]
     [DataRow(
         "int from 0 to 3 `^3sqrt{x^2 +1}dx",
-        // PARTIAL: from/to → _/^ now works. Remaining gap: `^3sqrt` glued
-        // token still passes through. Would need a regex pre-pass to split
-        // `^Nsqrt` into ` ^ N sqrt ` tokens (deferred).
-        @"\int _ 0 ^ 3 ^3sqrt { x^2 +1 } dx",
-        DisplayName = "Pattern3_IntegralInlineNthRoot")]
+        // OK: NthRootShorthandRegex pre-pass normalizes `^3sqrt` → `root {3} of`
+        // so this now renders identically to Pattern4's root-of form.
+        @"\int _ 0 ^ 3 \sqrt[ 3 ]{ x^2 +1 } dx",
+        DisplayName = "Pattern3_IntegralInlineNthRoot_OK")]
     [DataRow(
         "int from 0 to 3 `root {3} of {x^2 +1} dx",
         @"\int _ 0 ^ 3 \sqrt[ 3 ]{ x^2 +1 } dx",

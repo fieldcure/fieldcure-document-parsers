@@ -285,6 +285,13 @@ internal static partial class HancomMathNormalizer
         // Remove Hancom accessibility prefix
         var result = script.Replace("수식입니다.", "").Trim();
 
+        // Pre-pass: normalize nth-root shorthand `^N sqrt` to `root {N} of`
+        // so ReplaceRootOf handles all forms uniformly. Covers:
+        //   ^3sqrt{x}      ^ 3 sqrt{x}     ^{3}sqrt{x}     ^{3} sqrt {x}
+        // Padding with spaces on both sides protects against adjacent tokens
+        // gluing (e.g. `3 \`^3sqrt` where ` followed by ^).
+        result = NthRootShorthandRegex().Replace(result, " root {$1} of ");
+
         // Pre-pass: BUILDREL drops the lower-label arm (spec §1.2). Strip any
         // trailing {lower} group so the upper label is all RelArrowRegex sees.
         //   BUILDREL <arrow> {upper} {lower} → BUILDREL <arrow> {upper}
@@ -579,6 +586,13 @@ internal static partial class HancomMathNormalizer
     // IgnoreCase intentionally off — `BUILDREL` is uppercase per spec §1.2.
     [GeneratedRegex(@"(BUILDREL\s+\S+\s+\{[^}]*\})\s+\{[^}]*\}")]
     private static partial Regex BuildrelDropLowerRegex();
+
+    // Nth-root shorthand. Captures the degree (digits, optionally braced) so
+    // `^3sqrt{x}` and `^{3} sqrt {x}` both rewrite to `root {3} of {x}`.
+    // The trailing \b (word boundary) prevents matching substrings like
+    // `^3sqrtX` where sqrt is part of a longer identifier.
+    [GeneratedRegex(@"\^\s*\{?\s*(\d+)\s*\}?\s*sqrt\b")]
+    private static partial Regex NthRootShorthandRegex();
 
     [GeneratedRegex(@"\s{2,}")]
     private static partial Regex MultiSpaceRegex();
