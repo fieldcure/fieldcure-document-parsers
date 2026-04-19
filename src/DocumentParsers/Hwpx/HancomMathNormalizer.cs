@@ -492,32 +492,7 @@ internal static partial class HancomMathNormalizer
     /// (already normalized to lowercase by the token map).
     /// </summary>
     private static string ReplaceFrac(string s)
-    {
-        const string keyword = " over ";
-        var searchStart = 0;
-        while (searchStart < s.Length)
-        {
-            var cursor = s.IndexOf(keyword, searchStart, StringComparison.Ordinal);
-            if (cursor < 0) break;
-            try
-            {
-                var (numStart, numEnd) = FindBracketsBackward(s, cursor);
-                var before    = s[..numStart];
-                var numerator = s[numStart..numEnd];
-                var after     = s[(cursor + keyword.Length)..];
-                s = before + @"\frac" + numerator + " " + after;
-                searchStart = 0; // string changed — restart from beginning
-            }
-            catch (InvalidOperationException)
-            {
-                // No braced numerator at this spot (e.g. `a over b` without braces).
-                // Skip past this keyword occurrence and keep searching — later
-                // occurrences may still be braced.
-                searchStart = cursor + keyword.Length;
-            }
-        }
-        return s;
-    }
+        => ReplaceInfixBinary(s, " over ", (num, den) => $@"\frac{{{num}}}{{{den}}}");
 
     /// <summary>
     /// Replaces <c>root {n} of {expr}</c> with <c>\sqrt[n]{expr}</c>.

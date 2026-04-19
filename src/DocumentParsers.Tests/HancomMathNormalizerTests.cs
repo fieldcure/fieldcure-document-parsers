@@ -21,9 +21,8 @@ public class HancomMathNormalizerTests
     [TestMethod]
     [DataRow(
         "10a^3 over b^2 times ~□ ~÷ b^3 over 2a =( 2a^2 over b )^3",
-        // BUG: `over` without {braces} is not converted.
-        @"10a^3 over b^2 \times □ ÷ b^3 over 2a = ( 2a^2 over b ) ^3",
-        DisplayName = "Pattern1_FractionMulExp")]
+        @"\frac{10a^3}{b^2} \times □ ÷ \frac{b^3}{2a} = ( \frac{2a^2}{b} ) ^3",
+        DisplayName = "Pattern1_FractionMulExp_OK")]
     [DataRow(
         "(A UNION B)^C` =` A^C INTER B^C",
         @"( A \bigcup B ) ^C = A^C \bigcap B^C",
@@ -47,8 +46,8 @@ public class HancomMathNormalizerTests
     [DataRow(
         "lim_N->inf 1 over N sum_n=1^N\nLEFT(SUM_k=1^n 1 over 2^k right)",
         // LIMITATION: space-less tokens (lim_N, sum_n, SUM_k) out of scope.
-        // C5/C6 additions did unlock LEFT/right → \left/\right via paren padding.
-        @"lim_N->inf 1 over N sum_n=1^N \left ( SUM_k=1^n 1 over 2^k \right )",
+        // Fractions, LEFT/right all resolve though.
+        @"lim_N->inf \frac{1}{N} sum_n=1^N \left ( SUM_k=1^n \frac{1}{2^k} \right )",
         DisplayName = "Pattern7_SpacelessLim_Partial")]
     public void Patterns_Snapshot(string input, string expected)
         => Assert.AreEqual(expected, HancomMathNormalizer.ToLaTeX(input));
@@ -62,9 +61,8 @@ public class HancomMathNormalizerTests
         @"2 \times 5 = 10",
         DisplayName = "Spec01_Times_OK")]
     [DataRow("1 over 2",
-        // BUG: brace-less `over` unconverted.
-        "1 over 2",
-        DisplayName = "Spec02_OverBraceless")]
+        @"\frac{1}{2}",
+        DisplayName = "Spec02_OverBraceless_OK")]
     [DataRow("x atop y",
         @"{x \atop y}",
         DisplayName = "Spec03_Atop_OK")]
@@ -72,14 +70,15 @@ public class HancomMathNormalizerTests
         @"\sqrt 2 , \sqrt { 2 } , \sqrt[ 2 ]{ 2 }",
         DisplayName = "Spec04_SqrtThreeForms_OK")]
     [DataRow("1 over 2 + {1} over {2} + {n um} over {den}",
-        // PARTIAL: braced forms convert; brace-less does not.
-        @"1 over 2 + \frac{ 1 } { 2 } + \frac{ n um } { den }",
-        DisplayName = "Spec05_OverBraceVariants_PartialOK")]
+        @"\frac{1}{2} + \frac{1}{2} + \frac{n um}{den}",
+        DisplayName = "Spec05_OverBraceVariants_OK")]
     [DataRow("A REL <-> {+2} {-5} B # C BUILDREL <-> {+2} D",
         @"A \leftrightarrow { +2 } { -5 } B # C \leftrightarrow { +2 } D",
         DisplayName = "Spec06_RelBuildrel")]
     [DataRow("{a+b} over {a-b} bigg / {x+y} over {x-y}",
-        @"\frac{ a+b } { a-b } bigg / \frac{ x+y } { x-y }",
+        // PARTIAL: both fractions convert; `bigg` (size modifier, spec §1.2)
+        // still passes through as literal.
+        @"\frac{a+b}{a-b} bigg / \frac{x+y}{x-y}",
         DisplayName = "Spec07_Bigg")]
     [DataRow("x times y &= z # z &= 10",
         @"x \times y & = z # z & = 10",
@@ -143,14 +142,14 @@ public class HancomMathNormalizerTests
         @"\mathrm x , \mathit x , \mathbf x",
         DisplayName = "Spec22_FontSwitches_PartialOK")]
     [DataRow("y = lim _{x -> 0} {{1} over {x}}",
-        @"y = \lim _ { x \rightarrow 0 } { \frac{ 1 } { x } }",
+        @"y = \lim _ { x \rightarrow 0 } { \frac{1}{x} }",
         DisplayName = "Spec23_LimProperForm_OK")]
     [DataRow(
         "lim _{} { {x} over {a}} , lim _{a rarrow 0} {x^a}, lim _{ a->0} {x^a}, # \nLim _{} {x/a}, Lim _{ a->0} {x/a }, Lim _{ x->inf} {2x over x^2 }",
-        // Newline-split now drops the `Lim` glue issue; all lim/Lim convert.
-        // Remaining: `a->0` space-less still literal (space-less out of scope).
-        @"\lim _ { } { \frac{ x } { a } } , \lim _ { a \rightarrow 0 } { x^a } , \lim _ { a->0 } { x^a } , # \lim _ { } { x/a } , \lim _ { a->0 } { x/a } , \lim _ { x->inf } { 2x over x^2 }",
-        DisplayName = "Spec24_LimVariants")]
+        // All lim/Lim/over convert. Remaining: `a->0` space-less still literal
+        // (space-less out of scope).
+        @"\lim _ { } { \frac{x}{a} } , \lim _ { a \rightarrow 0 } { x^a } , \lim _ { a->0 } { x^a } , # \lim _ { } { x/a } , \lim _ { a->0 } { x/a } , \lim _ { x->inf } { \frac{2x}{x^2} }",
+        DisplayName = "Spec24_LimVariants_OK")]
     [DataRow(
         "COPROD _{x} ^{y} , COPROD from {x} to {y}, COPROD from x to y",
         @"\coprod _ { x } ^ { y } , \coprod _ { x } ^ { y } , \coprod _ x ^ y",
