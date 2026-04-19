@@ -36,17 +36,23 @@ internal static partial class HancomMathNormalizer
             // Spec §1.2: UNION/INTER are the big operator forms (take sub/sup).
             // SMALLUNION/SMALLINTER are the inline (∪/∩) forms.
             ["UNION"] = @"\bigcup",     ["INTER"] = @"\bigcap",
-            ["SMALLUNION"] = @"\cup",
+            ["SMALLUNION"] = @"\cup",   ["CAP"] = @"\cap",
+            ["PROD"] = @"\prod",        ["COPROD"] = @"\coprod",
+            ["VEE"] = @"\vee",          ["WEDGE"] = @"\wedge",
+            ["OSLASH"] = @"\oslash",
             ["OPLUS"] = @"\oplus",      ["OMINUS"] = @"\ominus",
             ["OTIMES"] = @"\otimes",    ["ODIV"] = @"\oslash",
             ["ODOT"] = @"\odot",
             ["LOR"] = @"\lor",          ["LAND"] = @"\land",
             ["SUBSET"] = @"\subset",    ["SUPERSET"] = @"\supset",
+            ["SUPSET"] = @"\supset",
             ["SUBSETEQ"] = @"\subseteq", ["SUPSETEQ"] = @"\supseteq",
             ["IN"] = @"\in",            ["OWNS"] = @"\owns",
-            ["NOTIN"] = @"\notin",
+            ["NOTIN"] = @"\notin",      ["notin"] = @"\notin",
             ["SQCAP"] = @"\sqcap",      ["SQCUP"] = @"\sqcup",
             ["SQSUBSET"] = @"\sqsubset", ["SQSUBSETEQ"] = @"\sqsubseteq",
+            ["SQSUPSET"] = @"\sqsupset", ["SQSUPSETEQ"] = @"\sqsupseteq",
+            ["LLL"] = @"\lll",
             ["BIGSQCUP"] = @"\bigsqcup",
             ["BIGOPLUS"] = @"\bigoplus", ["BIGOTIMES"] = @"\bigotimes",
             ["BIGODOT"] = @"\bigodot",  ["BIGUPLUS"] = @"\biguplus",
@@ -64,6 +70,7 @@ internal static partial class HancomMathNormalizer
             ["APPROX"] = @"\approx", ["approx"] = @"\approx",
             ["SIMEQ"] = @"\simeq",   ["CONG"] = @"\cong",
             ["=="] = @"\equiv",      ["equiv"] = @"\equiv",
+            ["IDENTICAL"] = @"\equiv", ["EQUIV"] = @"\equiv",
             ["!="] = @"\neq",        ["neq"] = @"\neq",
             ["DOTEQ"] = @"\doteq",   ["ASYMP"] = @"\asymp",
             ["ISO"] = @"\Bumpeq",    ["DSUM"] = @"\dotplus",
@@ -72,8 +79,10 @@ internal static partial class HancomMathNormalizer
 
             // ── Arithmetic ────────────────────────────────────────────────
             ["±"] = @"\pm",          ["pm"] = @"\pm",
+            ["PLUSMINUS"] = @"\pm",  ["MINUSPLUS"] = @"\mp",
             ["-+"] = @"\mp",         ["mp"] = @"\mp",
             ["÷"] = @"\div",         ["div"] = @"\div",
+            ["DIV"] = @"\div",       ["DIVIDE"] = @"\div",
             ["UPLUS"] = @"\uplus",
             ["CIRC"] = @"\circ",     ["BULLET"] = @"\bullet",
             ["DEG"] = @" ^\circ",
@@ -93,7 +102,8 @@ internal static partial class HancomMathNormalizer
             ["int"] = @"\int",       ["dint"] = @"\iint",
             ["tint"] = @"\iiint",    ["oint"] = @"\oint",
             ["lim"] = @"\lim",       ["Lim"] = @"\lim",
-            ["Partial"] = @"\partial",
+            ["Partial"] = @"\partial",  ["PARTIAL"] = @"\partial",
+            ["partial"] = @"\partial",
             ["INF"] = @"\infty",     ["inf"] = @"\infty",
             ["NABLA"] = @"\nabla",   ["PROPTO"] = @"\propto",
             // Unicode integral/sum/product symbols embedded directly in HWPX scripts
@@ -106,15 +116,22 @@ internal static partial class HancomMathNormalizer
             ["THEREFORE"] = @"\therefore", ["BECAUSE"] = @"\because",
             ["EXIST"] = @"\exists",  ["FORALL"] = @"\forall",
             ["prime"] = @"'",        ["DIAMOND"] = @"\diamond",
+            ["LNOT"] = @"\lnot",     ["NOT"] = @"\neg",
+            ["IMAG"] = @"\Im",       ["image"] = @"\Im",
+            ["REIMAGE"] = @"\Re",    ["reimage"] = @"\Re",
             ["LAPLACE"] = @"\mathcal{L}",
             ["TRIANGLE"] = @"\triangle",
+            ["TRIANGLED"] = @"\triangledown",
+            ["RTANGLE"] = @"\sphericalangle",
             ["ANGLE"] = @"\angle",   ["MSANGLE"] = @"\measuredangle",
             ["SANGLE"] = @"\sphericalangle",
             ["VDASH"] = @"\vdash",   ["DASHV"] = @"\dashv",
             ["BOT"] = @"\bot",       ["TOP"] = @"\top",
             ["MODELS"] = @"\models",
-            ["CDOTS"] = @"\cdots",   ["LDOTS"] = @"\ldots",
-            ["VDOTS"] = @"\vdots",   ["DDOTS"] = @"\ddots",
+            ["CDOTS"] = @"\cdots",   ["cdots"] = @"\cdots",
+            ["LDOTS"] = @"\ldots",   ["ldots"] = @"\ldots",
+            ["VDOTS"] = @"\vdots",   ["vdots"] = @"\vdots",
+            ["DDOTS"] = @"\ddots",   ["ddots"] = @"\ddots",
             ["DAGGER"] = @"\dagger", ["DDAGGER"] = @"\ddagger",
             ["MAPSTO"] = @"\mapsto", ["under"] = @"\underline",
             ["LSLANT"] = @"\diagup", ["RSLANT"] = @"\diagdown",
@@ -130,6 +147,8 @@ internal static partial class HancomMathNormalizer
             ["LRarrow"] = @"\Leftrightarrow",
             ["uarrow"] = @"\uparrow",
             ["darrow"] = @"\downarrow",
+            ["uparrow"] = @"\uparrow",      ["downarrow"] = @"\downarrow",
+            ["updownarrow"] = @"\updownarrow",
             ["LARROW"] = @"\Leftarrow",
             ["RARROW"] = @"\Rightarrow",
             ["UPARROW"] = @"\Uparrow",
@@ -141,8 +160,14 @@ internal static partial class HancomMathNormalizer
             ["LRARROW"] = @"\Leftrightarrow",
             ["NWARROW"] = @"\nwarrow",   ["SEARROW"] = @"\searrow",
             ["NEARROW"] = @"\nearrow",   ["SWARROW"] = @"\swarrow",
+            ["nwarrow"] = @"\nwarrow",   ["searrow"] = @"\searrow",
+            ["nearrow"] = @"\nearrow",   ["swarrow"] = @"\swarrow",
             ["HOOKLEFT"] = @"\hookleftarrow",
             ["HOOKRIGHT"] = @"\hookrightarrow",
+            ["hookleft"] = @"\hookleftarrow",
+            ["hookright"] = @"\hookrightarrow",
+            ["mapsto"] = @"\mapsto",
+            ["vert"] = @"\vert",         ["VERT"] = @"\Vert",
 
             // ── Greek (lowercase keyword form) ────────────────────────────
             // Note: HWPX typically embeds Unicode directly (τ, λ, γ, …).
@@ -191,10 +216,45 @@ internal static partial class HancomMathNormalizer
             ["Phi"] = @"\Phi",       ["Chi"] = "X",
             ["Psi"] = @"\Psi",       ["Omega"] = @"\Omega",
 
-            // ── Trig / Functions ──────────────────────────────────────────
+            // ── Math letters (spec §1.2.4, 수학 문자) ───────────────────
+            ["ALEPH"] = @"\aleph",       ["HBAR"] = @"\hbar",
+            ["IMATH"] = @"\imath",       ["JMATH"] = @"\jmath",
+            ["OHM"] = @"\Omega",         ["ELL"] = @"\ell",
+            ["Liter"] = @"\ell",         ["WP"] = @"\wp",
+            ["ANGSTROM"] = @"\AA",
+            ["vartheta"] = @"\vartheta", ["varpi"] = @"\varpi",
+            ["varsigma"] = @"\varsigma", ["varupsilon"] = @"\varUpsilon",
+            ["varphi"] = @"\varphi",     ["varepsilon"] = @"\varepsilon",
+
+            // ── Trig / Functions (spec §1.1.3 roman-type) ──────────────────
             ["log"] = @"\log",       ["ln"] = @"\ln",
+            ["lg"] = @"\lg",         ["lcm"] = @"\lcm",
             ["sin"] = @"\sin",       ["cos"] = @"\cos",
-            ["tan"] = @"\tan",
+            ["tan"] = @"\tan",       ["cot"] = @"\cot",
+            ["sec"] = @"\sec",       ["csc"] = @"\csc",
+            ["cosec"] = @"\csc",
+            ["sinh"] = @"\sinh",     ["cosh"] = @"\cosh",
+            ["tanh"] = @"\tanh",     ["coth"] = @"\coth",
+            ["arcsin"] = @"\arcsin", ["arccos"] = @"\arccos",
+            ["arctan"] = @"\arctan",
+            ["asin"] = @"\arcsin",   ["acos"] = @"\arccos",
+            ["atan"] = @"\arctan",
+            ["exp"] = @"\exp",       ["Exp"] = @"\exp",
+            ["max"] = @"\max",       ["min"] = @"\min",
+            ["det"] = @"\det",       ["gcd"] = @"\gcd",
+            ["mod"] = @"\bmod",
+            ["arg"] = @"\arg",       ["deg"] = @"\deg",
+            ["dim"] = @"\dim",       ["ker"] = @"\ker",
+            ["hom"] = @"\hom",       ["Pr"] = @"\Pr",
+
+            // ── Font switches (spec §1.1.1.1) ──────────────────────────────
+            // LaTeX's \mathrm/\mathit/\mathbf take the following braced group
+            // as argument. When the spec input is `rm {body}` the result is
+            // correct; `rm body` (no braces) makes only the first char roman.
+            // That's the same degraded behavior the Hancom editor exhibits.
+            ["rm"] = @"\mathrm",
+            ["it"] = @"\mathit",
+            ["bold"] = @"\mathbf",
 
             // ── HWPX-specific ─────────────────────────────────────────────
             // OVER: HWPX uses uppercase; normalize to lowercase for ReplaceFrac
@@ -309,19 +369,30 @@ internal static partial class HancomMathNormalizer
             return string.IsNullOrEmpty(label) ? $"{cmd}{{}}" : $"{cmd}{{{label}}}";
         });
 
-        // Tokenize: backticks → space; pad braces, pipes, & and , with spaces
+        // Tokenize: backticks → space; pad braces, pipes, & , ( ) with spaces
         // | must be padded so that "RIGHT |LEFT" doesn't merge into "|LEFT" token
         // , must be padded so keywords like "alpha, beta" tokenize as
         //   [alpha] [,] [beta] instead of [alpha,] [beta] (unmatched in map)
+        // ( ) padding unglues function-call forms like `sinh(x)` → [sinh] [(] [x] [)]
+        // so `sinh` is seen as a standalone token the map can match. Also fixes
+        // `LEFT(...` glued forms.
         result = result.Replace("`", " ")
                        .Replace("{", " { ")
                        .Replace("}", " } ")
                        .Replace("|", " | ")
                        .Replace("&", " & ")
-                       .Replace(",", " , ");
+                       .Replace(",", " , ")
+                       .Replace("(", " ( ")
+                       .Replace(")", " ) ");
 
-        var tokens = result.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                           .ToList();
+        // Split on any whitespace, not just ' '. HWPX equation scripts can have
+        // literal \n / \r / \t between tokens (especially when authored with
+        // Enter for line breaks inside the equation editor). Splitting only on
+        // ' ' previously glued newline-adjacent tokens like `\nDIV` together,
+        // causing map lookups to miss dozens of otherwise-mapped keywords.
+        var tokens = result.Split(
+            new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
 
         // Token mapping (ConvertMap takes priority over MiddleConvertMap)
         for (var i = 0; i < tokens.Count; i++)

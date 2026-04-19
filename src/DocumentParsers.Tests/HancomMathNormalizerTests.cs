@@ -8,10 +8,8 @@ namespace FieldCure.DocumentParsers.Tests;
 ///   - hwpx-math-spec.hwpx     : full spec §1.2 basic-command reference
 ///     plus complete symbol inventory. 32 scripts.
 ///
-/// Expected strings capture CURRENT behavior. Many entries are known-broken
-/// (marked BUG/LIMITATION). The TARGET rendering for each spec script is in
-/// todo/hwpx-math-spec_rev.pdf (not in-repo). When future patches land, the
-/// affected snapshots must be updated to the new output.
+/// Expected strings capture CURRENT behavior. Target renderings are in
+/// todo/hwpx-math-spec_rev.pdf (not in-repo).
 /// </summary>
 [TestClass]
 public class HancomMathNormalizerTests
@@ -24,16 +22,14 @@ public class HancomMathNormalizerTests
     [DataRow(
         "10a^3 over b^2 times ~□ ~÷ b^3 over 2a =( 2a^2 over b )^3",
         // BUG: `over` without {braces} is not converted.
-        @"10a^3 over b^2 \times □ ÷ b^3 over 2a =( 2a^2 over b )^3",
+        @"10a^3 over b^2 \times □ ÷ b^3 over 2a = ( 2a^2 over b ) ^3",
         DisplayName = "Pattern1_FractionMulExp")]
     [DataRow(
         "(A UNION B)^C` =` A^C INTER B^C",
-        @"(A \bigcup B)^C = A^C \bigcap B^C",
+        @"( A \bigcup B ) ^C = A^C \bigcap B^C",
         DisplayName = "Pattern2_DeMorgan_OK")]
     [DataRow(
         "int from 0 to 3 `^3sqrt{x^2 +1}dx",
-        // OK: NthRootShorthandRegex pre-pass normalizes `^3sqrt` → `root {3} of`
-        // so this now renders identically to Pattern4's root-of form.
         @"\int _ 0 ^ 3 \sqrt[ 3 ]{ x^2 +1 } dx",
         DisplayName = "Pattern3_IntegralInlineNthRoot_OK")]
     [DataRow(
@@ -50,9 +46,10 @@ public class HancomMathNormalizerTests
         DisplayName = "Pattern6_BMatrix_OK")]
     [DataRow(
         "lim_N->inf 1 over N sum_n=1^N\nLEFT(SUM_k=1^n 1 over 2^k right)",
-        // LIMITATION: space-less compound tokens out of scope.
-        "lim_N->inf 1 over N sum_n=1^N\nLEFT(SUM_k=1^n 1 over 2^k right)",
-        DisplayName = "Pattern7_SpacelessLim")]
+        // LIMITATION: space-less tokens (lim_N, sum_n, SUM_k) out of scope.
+        // C5/C6 additions did unlock LEFT/right → \left/\right via paren padding.
+        @"lim_N->inf 1 over N sum_n=1^N \left ( SUM_k=1^n 1 over 2^k \right )",
+        DisplayName = "Pattern7_SpacelessLim_Partial")]
     public void Patterns_Snapshot(string input, string expected)
         => Assert.AreEqual(expected, HancomMathNormalizer.ToLaTeX(input));
 
@@ -76,16 +73,10 @@ public class HancomMathNormalizerTests
         @"\sqrt 2 , \sqrt { 2 } , \sqrt[ 2 ]{ 2 }",
         DisplayName = "Spec04_SqrtThreeForms_OK")]
     [DataRow("1 over 2 + {1} over {2} + {n um} over {den}",
-        // PARTIAL: braced `over` forms convert (B1 fix lets loop continue past
-        // the brace-less failure). Brace-less `1 over 2` still unchanged.
-        // Note: `{n um}` stays literal — spec §1.1.2.3 would quote 9+ char
-        // tokens but our parser doesn't follow that rule.
+        // PARTIAL: braced forms convert; brace-less does not.
         @"1 over 2 + \frac{ 1 } { 2 } + \frac{ n um } { den }",
         DisplayName = "Spec05_OverBraceVariants_PartialOK")]
     [DataRow("A REL <-> {+2} {-5} B # C BUILDREL <-> {+2} D",
-        // OK: REL keeps both labels, BUILDREL drops lower (B3 fix). But since
-        // the test input has only one label after BUILDREL, the B3 regex
-        // doesn't match here — behavior identical to before.
         @"A \leftrightarrow { +2 } { -5 } B # C \leftrightarrow { +2 } D",
         DisplayName = "Spec06_RelBuildrel")]
     [DataRow("{a+b} over {a-b} bigg / {x+y} over {x-y}",
@@ -111,71 +102,67 @@ public class HancomMathNormalizerTests
         DisplayName = "Spec12_GreekLowercase_OK")]
     [DataRow(
         "ALEPH, HBAR, IMATH, JMATH, OHM, ELL, Liter, WP, IMAG, ANGSTROM, vartheta, varpi, varsigma, varupsilon, varphi, varepsilon",
-        // BUG: math-letter family unmapped.
-        "ALEPH , HBAR , IMATH , JMATH , OHM , ELL , Liter , WP , IMAG , ANGSTROM , vartheta , varpi , varsigma , varupsilon , varphi , varepsilon",
-        DisplayName = "Spec13_MathLetters")]
+        @"\aleph , \hbar , \imath , \jmath , \Omega , \ell , \ell , \wp , \Im , \AA , \vartheta , \varpi , \varsigma , \varUpsilon , \varphi , \varepsilon",
+        DisplayName = "Spec13_MathLetters_OK")]
     [DataRow(
         "Sigma, PROD, PROD from x to y , PROD from x , PROD to y ,COPROD, COPROD from x to y , COPROD from x , COPROD to y ,\nINTER, INTER from x to y , INTER from x , INTER to y , CAP, SQCAP, \nSQCUP, OPLUS, OMINUS,\nOTIMES, ODOT, OSLASH,\nVEE, WEDGE, SUBSET,",
-        // PARTIAL: INTER → \bigcap; from/to → _/^. PROD/COPROD/CAP/VEE/WEDGE/
-        // OTIMES/SUBSET first-after-newline still literal (newline-gluing bug).
-        // Also note `Sigma` (Pascal) → \Sigma; bare `SIGMA` ALL-CAPS also works.
-        @"\Sigma , PROD , PROD _ x ^ y , PROD _ x , PROD ^ y , COPROD , COPROD _ x ^ y , COPROD _ x , COPROD ^ y , INTER , \bigcap _ x ^ y , \bigcap _ x , \bigcap ^ y , CAP , \sqcap , SQCUP , \oplus , \ominus , OTIMES , \odot , OSLASH , VEE , WEDGE , \subset ,",
-        DisplayName = "Spec14_BigOpsFromTo_Partial")]
+        @"\Sigma , \prod , \prod _ x ^ y , \prod _ x , \prod ^ y , \coprod , \coprod _ x ^ y , \coprod _ x , \coprod ^ y , \bigcap , \bigcap _ x ^ y , \bigcap _ x , \bigcap ^ y , \cap , \sqcap , \sqcup , \oplus , \ominus , \otimes , \odot , \oslash , \vee , \wedge , \subset ,",
+        DisplayName = "Spec14_BigOpsFromTo_OK")]
     [DataRow(
         "SUPSET, SUBSETEQ, SUPSETEQ,\nIN, OWNS, notin,\nLEQ, GEQ, SQSUBSET,\nSQSUPSET, SQSUBSETEQ, SQSUPSETEQ,\n<<, >>, LLL,\n>>>, PREC, SUCC,\nUPLUS",
-        // BUG: newline-not-split leaves IN/LEQ/SQSUPSET/>>>/UPLUS literal as
-        // first token after each \n.
-        @"SUPSET , \subseteq , \supseteq , IN , \owns , notin , LEQ , \geq , \sqsubset , SQSUPSET , \sqsubseteq , SQSUPSETEQ , << , \gg , LLL , >>> , \prec , \succ , UPLUS",
-        DisplayName = "Spec15_MoreRelations_PartialConvert")]
+        @"\supset , \subseteq , \supseteq , \in , \owns , \notin , \leq , \geq , \sqsubset , \sqsupset , \sqsubseteq , \sqsupseteq , \ll , \gg , \lll , \ggg , \prec , \succ , \uplus",
+        DisplayName = "Spec15_MoreRelations_OK")]
     [DataRow(
         "PLUSMINUS, MINUSPLUS, times,\nDIV, DIVIDE, CIRC, BULLET,\nDEG, AST, STAR,\nBIGCIRC, EMPTYSET, THEREFORE,\nBECAUSE, IDENTICAL, EXIST,\nneq, !=, DOTEQ, image, reimage, REIMAGE",
-        @"PLUSMINUS , MINUSPLUS , \times , DIV , DIVIDE , \circ , \bullet , DEG , \ast , \bigstar , BIGCIRC , \emptyset , \therefore , BECAUSE , IDENTICAL , \exists , neq , \neq , \doteq , image , reimage , REIMAGE",
-        DisplayName = "Spec16_Arithmetic_PartialConvert")]
+        @"\pm , \mp , \times , \div , \div , \circ , \bullet , ^\circ , \ast , \bigstar , \bigcirc , \emptyset , \therefore , \because , \equiv , \exists , \neq , \neq , \doteq , \Im , \Re , \Re",
+        DisplayName = "Spec16_Arithmetic_OK")]
     [DataRow(
         "REIMAGE SIM APPROX\nSIMEQ CONG ==, EQUIV\nASYMP ISO DIAMOND\nDSUM FORALL prime\nPARTIAL inf LNOT\nPROPTO XOR TRIANGLED\nDAGGER DDAGGER",
-        "REIMAGE \\sim APPROX\nSIMEQ \\cong \\equiv , EQUIV\nASYMP \\Bumpeq DIAMOND\nDSUM \\forall prime\nPARTIAL \\infty LNOT\nPROPTO \\veebar TRIANGLED\nDAGGER \\ddagger",
-        DisplayName = "Spec17_Relations_PartialConvert")]
+        @"\Re \sim \approx \simeq \cong \equiv , \equiv \asymp \Bumpeq \diamond \dotplus \forall ' \partial \infty \lnot \propto \veebar \triangledown \dagger \ddagger",
+        DisplayName = "Spec17_Relations_OK")]
     [DataRow(
         "larrow, rarrow, uparrow,\ndownarrow, LARROW, RARROW,\nUPARROW, DOWNARROW, udarrow,\nlrarrow, UDARROW, LRARROW,\nnwarrow, searrow, nearrow,\nswarrow, hookleft, hookright,\nmapsto, vert, VERT",
-        // PARTIAL: larrow/rarrow/LARROW/RARROW/udarrow/UDARROW/LRARROW/Downarrow
-        // convert. First-after-newline tokens (downarrow, UPARROW, lrarrow,
-        // nwarrow, swarrow, mapsto) are literal (\n glue). `uparrow` (lowercase)
-        // literal — map has only UPARROW.
-        @"\leftarrow , \rightarrow , uparrow , downarrow , \Leftarrow , \Rightarrow , UPARROW , \Downarrow , \updownarrow , lrarrow , \Updownarrow , \Leftrightarrow , nwarrow , searrow , nearrow , swarrow , hookleft , hookright , mapsto , vert , VERT",
-        DisplayName = "Spec18_Arrows_PartialConvert")]
+        @"\leftarrow , \rightarrow , \uparrow , \downarrow , \Leftarrow , \Rightarrow , \Uparrow , \Downarrow , \updownarrow , \leftrightarrow , \Updownarrow , \Leftrightarrow , \nwarrow , \searrow , \nearrow , \swarrow , \hookleftarrow , \hookrightarrow , \mapsto , \vert , \Vert",
+        DisplayName = "Spec18_Arrows_OK")]
     [DataRow(
         "cdots, LDOTS, VDOTS,\nDDOTS, TRIANGLE, TRIANGLED,\nANGLE, MSANGLE, SANGLE,\nRTANGLE, VDASH, HLEFT,\nBOT, TOP, MODELS,\nLAPLACE, CENTIGRADE, FAHRENHEIT,\nLSLANT, RSLANT, att,\nhund, thou, well,\nbase, benzene",
-        @"cdots , \ldots , \vdots , DDOTS , \triangle , TRIANGLED , ANGLE , \measuredangle , \sphericalangle , RTANGLE , \vdash , HLEFT , BOT , \top , \models , LAPLACE , ^{\circ}C , ^{\circ}F , LSLANT , \diagdown , att , hund , thou , well , base , benzene",
-        DisplayName = "Spec19_MiscSymbols_PartialConvert")]
+        // PARTIAL: HLEFT, att, hund, thou, well, base, benzene unmapped.
+        // These are obscure/uncommon symbols; defer until observed in real docs.
+        @"\cdots , \ldots , \vdots , \ddots , \triangle , \triangledown , \angle , \measuredangle , \sphericalangle , \sphericalangle , \vdash , HLEFT , \bot , \top , \models , \mathcal{L} , ^{\circ}C , ^{\circ}F , \diagup , \diagdown , att , hund , thou , well , base , benzene",
+        DisplayName = "Spec19_MiscSymbols_MostlyOK")]
     [DataRow(
         "sinh(x), cosh(x), arcsin(x), exp(x), \nmax(x,y), min(x,y),\ndet(A),\ngcd(x, y, z), mod(x, y)",
-        // BUG: spec §1.1.3 roman functions mostly missing. Parens still glue
-        // function name with args (e.g. `sinh(x)` → one token).
-        @"sinh(x) , cosh(x) , arcsin(x) , exp(x) , max(x , y) , min(x , y) , det(A) , gcd(x , y , z) , mod(x , y)",
-        DisplayName = "Spec20_RomanFunctions")]
+        @"\sinh ( x ) , \cosh ( x ) , \arcsin ( x ) , \exp ( x ) , \max ( x , y ) , \min ( x , y ) , \det ( A ) , \gcd ( x , y , z ) , \bmod ( x , y )",
+        DisplayName = "Spec20_RomanFunctions_OK")]
     [DataRow(
         "vec {x}, dyad {x}, acute {x}, grave {x}, dot {x}, ddot {x}, under {x}, bar {x}, hat {x}, check {x}, arch {x}, tilde {x}, box {x+y}",
         @"\overrightarrow{ x } , \overleftrightarrow{ x } , \acute{ x } , \grave{ x } , \dot{ x } , \ddot{ x } , \underline { x } , \overline{ x } , \widehat{ x } , \check{ x } , \overset{\frown}{ x } , \widetilde{ x } , box { x+y }",
         DisplayName = "Spec21_Decorations")]
     [DataRow("rm x, it x, bold x",
-        "rm x , it x , bold x",
-        DisplayName = "Spec22_FontSwitches")]
+        // PARTIAL: rm/it/bold → \mathrm/\mathit/\mathbf. Without braces the
+        // LaTeX output still only applies to one char (matches Hancom editor
+        // degraded behavior per spec §1.1.1.1).
+        @"\mathrm x , \mathit x , \mathbf x",
+        DisplayName = "Spec22_FontSwitches_PartialOK")]
     [DataRow("y = lim _{x -> 0} {{1} over {x}}",
         @"y = \lim _ { x \rightarrow 0 } { \frac{ 1 } { x } }",
         DisplayName = "Spec23_LimProperForm_OK")]
     [DataRow(
         "lim _{} { {x} over {a}} , lim _{a rarrow 0} {x^a}, lim _{ a->0} {x^a}, # \nLim _{} {x/a}, Lim _{ a->0} {x/a }, Lim _{ x->inf} {2x over x^2 }",
-        @"\lim _ { } { \frac{ x } { a } } , \lim _ { a \rightarrow 0 } { x^a } , \lim _ { a->0 } { x^a } , # Lim _ { } { x/a } , \lim _ { a->0 } { x/a } , \lim _ { x->inf } { 2x over x^2 }",
+        // Newline-split now drops the `Lim` glue issue; all lim/Lim convert.
+        // Remaining: `a->0` space-less still literal (space-less out of scope).
+        @"\lim _ { } { \frac{ x } { a } } , \lim _ { a \rightarrow 0 } { x^a } , \lim _ { a->0 } { x^a } , # \lim _ { } { x/a } , \lim _ { a->0 } { x/a } , \lim _ { x->inf } { 2x over x^2 }",
         DisplayName = "Spec24_LimVariants")]
     [DataRow(
         "COPROD _{x} ^{y} , COPROD from {x} to {y}, COPROD from x to y",
-        // OK: per-spec, all three forms now render identically. COPROD itself
-        // unmapped but the surrounding _/^ normalize consistently.
-        @"COPROD _ { x } ^ { y } , COPROD _ { x } ^ { y } , COPROD _ x ^ y",
+        @"\coprod _ { x } ^ { y } , \coprod _ { x } ^ { y } , \coprod _ x ^ y",
         DisplayName = "Spec25_CoprodEquivalents_OK")]
     [DataRow("rm 2H_2 O = 2H_2 + O_2",
-        "rm 2H_2 O = 2H_2 + O_2",
-        DisplayName = "Spec26_Chemical")]
+        // PARTIAL: \mathrm applies to `2` only (next token). Same degraded
+        // behavior the Hancom editor exhibits (spec §1.1.3 note). For full
+        // chemical-formula fidelity user would write `rm {2H_2 O}`.
+        @"\mathrm 2H_2 O = 2H_2 + O_2",
+        DisplayName = "Spec26_Chemical_PartialOK")]
     [DataRow(
         "LONGDIV {b} {c} {a} , {LADDER{c&a&b#d&e&}} , {SLADDER{b&a&#c&d&}}",
         @"LONGDIV { b } { c } { a } , { LADDER { c & a & b#d & e & } } , { SLADDER { b & a & #c & d & } }",
@@ -185,16 +172,15 @@ public class HancomMathNormalizerTests
         DisplayName = "Spec28_Cases_OK")]
     [DataRow(
         "REL LRARROW {a} {b} , REL LRARROW {a} {}, REL lrarrow {a} {b} , REL lrarrow {a} {} , REL RARROW {a} {b} ,#\nREL RARROW {a} {}, REL rarrow {a} {b}, REL rarrow {a} {}, REL LARROW {a} {b}, REL LARROW {a} {}#\nREL larrow {a} {b} , REL larrow {a} {}, REL EXARROW {a} {b} , REL EXARROW {a} {}",
-        // PARTIAL: arrow conversion unchanged from C1. Comma padding slightly
-        // reformats the output but LRARROW/EXARROW still go to \xrightarrow
-        // (should be bidi / error-bar). Fix deferred.
-        "\\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , #\n\\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xleftarrow { a } , \\xleftarrow { a } #\n\\xleftarrow { a } , \\xleftarrow { a } , \\xrightarrow { a } , \\xrightarrow { a }",
+        // BUG: LRARROW/EXARROW resolve to \xrightarrow (should be bidi).
+        "\\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , # \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xleftarrow { a } , \\xleftarrow { a } # \\xleftarrow { a } , \\xleftarrow { a } , \\xrightarrow { a } , \\xrightarrow { a }",
         DisplayName = "Spec29_RelArrows")]
     [DataRow(
         "LEFT (  x RIGHT ), LEFT [ x RIGHT ], LEFT { x RIGHT }, LEFT < x RIGHT >, LEFT |  x RIGHT | #\n LEFT DLINE x RIGHT DLINE, LCEIL x RCEIL, LFLOOR x RFLOOR, OVERBRACE {x+y} {b}, UNDERBRACE {a} {x+y}",
         @"\left ( x \right ) , \left [ x \right ] , \left \{ x \right \} , \left < x \right > , \left | x \right | # \left DLINE x \right DLINE , LCEIL x RCEIL , LFLOOR x RFLOOR , \overbrace{ x+y }^{ b } , \underbrace{ a }^{ x+y }",
         DisplayName = "Spec30_LeftRightDelims")]
     [DataRow("pile{ abcd#b }\n# lpile{abcd #b} \n# rpile{abcd #b}",
+        // BUG: pile/lpile/rpile unmapped. Now split correctly via ( ) padding.
         "pile { abcd#b } # lpile { abcd #b } # rpile { abcd #b }",
         DisplayName = "Spec31_Pile")]
     [DataRow(
