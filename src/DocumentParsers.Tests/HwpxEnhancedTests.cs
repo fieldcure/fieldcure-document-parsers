@@ -272,4 +272,197 @@ public class HwpxEnhancedTests
     }
 
     #endregion
+
+    #region Multi-section footnote numbering (OWPML secPr/footNotePr/numbering)
+
+    [TestMethod]
+    public void Footnotes_MultiSection_Continuous_AccumulatesNumbers()
+    {
+        // Two sections, each with one footnote. Default OWPML behavior
+        // (no @type attribute) is CONTINUOUS → 1 in first section, 2 in second.
+        var data = CreateMultiSectionHwpx(secondSectionNumberingType: "CONTINUOUS");
+        var text = _parser.ExtractText(data);
+
+        Assert.IsTrue(text.Contains("[^1]"),
+            $"First footnote ref should be [^1]. Actual:\n{text}");
+        Assert.IsTrue(text.Contains("[^2]"),
+            $"Second footnote should accumulate to [^2] under CONTINUOUS. Actual:\n{text}");
+        Assert.IsTrue(text.Contains("각주 A") && text.Contains("각주 B"),
+            $"Both footnote bodies should appear. Actual:\n{text}");
+    }
+
+    [TestMethod]
+    public void Footnotes_MultiSection_RestartSection_ResetsPerSection()
+    {
+        // Second section declares RESTART_SECTION newNum=1 → its footnote is 1
+        // again, not 2. This is the behavior gap the roadmap called out.
+        var data = CreateMultiSectionHwpx(secondSectionNumberingType: "RESTART_SECTION");
+        var text = _parser.ExtractText(data);
+
+        // Both footnote refs render as [^1] since counter resets.
+        // FootnoteCollector de-dupes keys, so we'll see one [^1] per section in
+        // inline positions; the rendered bodies retain both.
+        var firstRefIdx  = text.IndexOf("[^1]", StringComparison.Ordinal);
+        var secondRefIdx = text.IndexOf("[^1]", firstRefIdx + 1, StringComparison.Ordinal);
+        Assert.IsTrue(firstRefIdx  >= 0, $"First [^1] missing. Actual:\n{text}");
+        Assert.IsTrue(secondRefIdx >  firstRefIdx,
+            $"Second section should produce another [^1] ref (RESTART_SECTION). Actual:\n{text}");
+
+        // RESTART_SECTION should NOT produce [^2] in the body refs.
+        Assert.IsFalse(text.Contains("[^2]"),
+            $"Under RESTART_SECTION no [^2] should appear. Actual:\n{text}");
+    }
+
+    [TestMethod]
+    public void Endnotes_MultiSection_RestartSection_ResetsPerSection()
+    {
+        // Same principle for endnotes: endNotePr/numbering@type="RESTART_SECTION"
+        // restarts the en-counter.
+        var data = CreateMultiSectionHwpxEndnotes(secondSectionNumberingType: "RESTART_SECTION");
+        var text = _parser.ExtractText(data);
+
+        var firstEn  = text.IndexOf("[^en1]", StringComparison.Ordinal);
+        var secondEn = text.IndexOf("[^en1]", firstEn + 1, StringComparison.Ordinal);
+        Assert.IsTrue(firstEn  >= 0, $"First [^en1] missing. Actual:\n{text}");
+        Assert.IsTrue(secondEn >  firstEn,
+            $"Second section should produce another [^en1] under RESTART_SECTION. Actual:\n{text}");
+        Assert.IsFalse(text.Contains("[^en2]"),
+            $"Under RESTART_SECTION no [^en2] should appear. Actual:\n{text}");
+    }
+
+    [TestMethod]
+    public void Footnotes_MultiSection_RestartPage_FallsBackToContinuous()
+    {
+        // HWPX has no logical page boundary for us to key off of, so
+        // RESTART_PAGE is treated as CONTINUOUS (documented limitation).
+        var data = CreateMultiSectionHwpx(secondSectionNumberingType: "RESTART_PAGE");
+        var text = _parser.ExtractText(data);
+
+        Assert.IsTrue(text.Contains("[^1]") && text.Contains("[^2]"),
+            $"RESTART_PAGE should behave like CONTINUOUS. Actual:\n{text}");
+    }
+
+    private static byte[] CreateMultiSectionHwpx(string secondSectionNumberingType)
+    {
+        using var ms = new MemoryStream();
+        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, true))
+        {
+            // Section 0: no explicit numbering policy (inherits default CONTINUOUS).
+            var sec0 = archive.CreateEntry("Contents/section0.xml");
+            using (var writer = new StreamWriter(sec0.Open(), Encoding.UTF8))
+            {
+                writer.Write("""
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
+                            xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
+                      <hp:p><hp:run>
+                        <hp:secPr>
+                          <hp:footNotePr>
+                            <hp:numbering type="CONTINUOUS" newNum="1"/>
+                          </hp:footNotePr>
+                        </hp:secPr>
+                        <hp:t>섹션 1 본문</hp:t>
+                        <hp:ctrl>
+                          <hp:footNote number="1" instId="1">
+                            <hp:subList>
+                              <hp:p><hp:run><hp:t>각주 A</hp:t></hp:run></hp:p>
+                            </hp:subList>
+                          </hp:footNote>
+                        </hp:ctrl>
+                      </hp:run></hp:p>
+                    </hs:sec>
+                    """);
+            }
+
+            // Section 1: numbering policy varies by test parameter.
+            var sec1 = archive.CreateEntry("Contents/section1.xml");
+            using (var writer = new StreamWriter(sec1.Open(), Encoding.UTF8))
+            {
+                writer.Write($"""
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
+                            xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
+                      <hp:p><hp:run>
+                        <hp:secPr>
+                          <hp:footNotePr>
+                            <hp:numbering type="{secondSectionNumberingType}" newNum="1"/>
+                          </hp:footNotePr>
+                        </hp:secPr>
+                        <hp:t>섹션 2 본문</hp:t>
+                        <hp:ctrl>
+                          <hp:footNote number="1" instId="2">
+                            <hp:subList>
+                              <hp:p><hp:run><hp:t>각주 B</hp:t></hp:run></hp:p>
+                            </hp:subList>
+                          </hp:footNote>
+                        </hp:ctrl>
+                      </hp:run></hp:p>
+                    </hs:sec>
+                    """);
+            }
+        }
+        return ms.ToArray();
+    }
+
+    private static byte[] CreateMultiSectionHwpxEndnotes(string secondSectionNumberingType)
+    {
+        using var ms = new MemoryStream();
+        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, true))
+        {
+            var sec0 = archive.CreateEntry("Contents/section0.xml");
+            using (var writer = new StreamWriter(sec0.Open(), Encoding.UTF8))
+            {
+                writer.Write("""
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
+                            xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
+                      <hp:p><hp:run>
+                        <hp:secPr>
+                          <hp:endNotePr>
+                            <hp:numbering type="CONTINUOUS" newNum="1"/>
+                          </hp:endNotePr>
+                        </hp:secPr>
+                        <hp:t>섹션 1</hp:t>
+                        <hp:ctrl>
+                          <hp:endNote number="1" instId="1">
+                            <hp:subList>
+                              <hp:p><hp:run><hp:t>미주 A</hp:t></hp:run></hp:p>
+                            </hp:subList>
+                          </hp:endNote>
+                        </hp:ctrl>
+                      </hp:run></hp:p>
+                    </hs:sec>
+                    """);
+            }
+
+            var sec1 = archive.CreateEntry("Contents/section1.xml");
+            using (var writer = new StreamWriter(sec1.Open(), Encoding.UTF8))
+            {
+                writer.Write($"""
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
+                            xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
+                      <hp:p><hp:run>
+                        <hp:secPr>
+                          <hp:endNotePr>
+                            <hp:numbering type="{secondSectionNumberingType}" newNum="1"/>
+                          </hp:endNotePr>
+                        </hp:secPr>
+                        <hp:t>섹션 2</hp:t>
+                        <hp:ctrl>
+                          <hp:endNote number="1" instId="2">
+                            <hp:subList>
+                              <hp:p><hp:run><hp:t>미주 B</hp:t></hp:run></hp:p>
+                            </hp:subList>
+                          </hp:endNote>
+                        </hp:ctrl>
+                      </hp:run></hp:p>
+                    </hs:sec>
+                    """);
+            }
+        }
+        return ms.ToArray();
+    }
+
+    #endregion
 }

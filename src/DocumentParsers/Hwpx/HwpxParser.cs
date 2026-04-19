@@ -62,6 +62,19 @@ public sealed class HwpxParser : IDocumentParser
 
             foreach (var sec in sectionElements)
             {
+                // Per-section footnote/endnote numbering policy (spec §1.2 and
+                // OWPML hp:footNotePr/hp:numbering). Counters are reset only
+                // when the section declares RESTART_SECTION; CONTINUOUS (the
+                // default and what most HWPX files emit) preserves accumulation
+                // across sections. RESTART_PAGE has no HWPX page boundary to
+                // key off of — treat as CONTINUOUS for now.
+                var (fnMode, fnNewNum) = ReadNoteNumbering(sec, "footNotePr");
+                var (enMode, enNewNum) = ReadNoteNumbering(sec, "endNotePr");
+                if (fnMode == NoteNumbering.RestartSection)
+                    footnoteCounter = fnNewNum - 1;
+                if (enMode == NoteNumbering.RestartSection)
+                    endnoteCounter = enNewNum - 1;
+
                 // Headers — before section body
                 if (options.IncludeHeaders)
                 {
@@ -527,6 +540,55 @@ public sealed class HwpxParser : IDocumentParser
         => localName.Equals("footNote", StringComparison.OrdinalIgnoreCase)
         || localName.Equals("endNote", StringComparison.OrdinalIgnoreCase)
         || localName.Equals("fieldBegin", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// How footnote or endnote numbers progress across section boundaries.
+    /// Derived from OWPML <c>hp:footNotePr/hp:numbering/@type</c> (or the
+    /// <c>endNotePr</c> variant) inside each section's <c>hp:secPr</c>.
+    /// </summary>
+    private enum NoteNumbering
+    {
+        /// <summary>Counter accumulates across all sections (OWPML default).</summary>
+        Continuous,
+        /// <summary>Counter resets to <c>newNum</c> at the start of each section.</summary>
+        RestartSection,
+        /// <summary>
+        /// Counter resets at each page break. HWPX has no page boundary signal
+        /// in the logical stream, so we can't implement this faithfully;
+        /// callers fall back to Continuous.
+        /// </summary>
+        RestartPage,
+    }
+
+    /// <summary>
+    /// Reads a section's footnote or endnote numbering policy from
+    /// <c>hp:secPr/hp:{notePrLocalName}/hp:numbering</c>. Returns
+    /// <see cref="NoteNumbering.Continuous"/> with start 1 when the element
+    /// is absent (so sections that don't re-declare policy inherit the running
+    /// counter).
+    /// </summary>
+    /// <param name="sec">The section element (<c>hs:sec</c> or <c>hp:sec</c>).</param>
+    /// <param name="notePrLocalName">Either <c>"footNotePr"</c> or <c>"endNotePr"</c>.</param>
+    private static (NoteNumbering mode, int newNum) ReadNoteNumbering(XElement sec, string notePrLocalName)
+    {
+        var numbering = sec.Descendants()
+            .FirstOrDefault(e => e.Name.LocalName.Equals(notePrLocalName, StringComparison.OrdinalIgnoreCase))
+            ?.Elements()
+            .FirstOrDefault(e => e.Name.LocalName.Equals("numbering", StringComparison.OrdinalIgnoreCase));
+
+        if (numbering is null) return (NoteNumbering.Continuous, 1);
+
+        var type = numbering.Attribute("type")?.Value ?? "CONTINUOUS";
+        var newNum = int.TryParse(numbering.Attribute("newNum")?.Value, out var n) ? n : 1;
+
+        var mode = type.ToUpperInvariant() switch
+        {
+            "RESTART_SECTION" => NoteNumbering.RestartSection,
+            "RESTART_PAGE"    => NoteNumbering.RestartPage,
+            _                 => NoteNumbering.Continuous,
+        };
+        return (mode, newNum);
+    }
 
     /// <summary>
     /// Extracts and concatenates all text from hp:t elements within a single paragraph (hp:p).
