@@ -66,9 +66,8 @@ public class HancomMathNormalizerTests
         "1 over 2",
         DisplayName = "Spec02_OverBraceless")]
     [DataRow("x atop y",
-        // BUG: ATOP (spec §1.2 basic cmd) missing from ConvertMap.
-        "x atop y",
-        DisplayName = "Spec03_Atop")]
+        @"{x \atop y}",
+        DisplayName = "Spec03_Atop_OK")]
     [DataRow("sqrt 2, sqrt {2}, root {2} of {2}",
         @"\sqrt 2 , \sqrt { 2 } , \sqrt[ 2 ]{ 2 }",
         DisplayName = "Spec04_SqrtThreeForms_OK")]
@@ -86,12 +85,11 @@ public class HancomMathNormalizerTests
         @"x \times y & = z # z & = 10",
         DisplayName = "Spec08_AlignMarkers")]
     [DataRow("A CHOOSE B",
-        // BUG: CHOOSE missing from ConvertMap.
-        "A CHOOSE B",
-        DisplayName = "Spec09_Choose")]
+        @"\binom{A}{B}",
+        DisplayName = "Spec09_Choose_OK")]
     [DataRow("binom A B",
-        "binom A B",
-        DisplayName = "Spec10_Binom")]
+        @"\binom{A}{B}",
+        DisplayName = "Spec10_Binom_OK")]
     [DataRow(
         "Alpha, Beta, Gamma, Delta, Epsilon, Zeta, Eta, Theta, Iota, Kappa, Lambda, Mu, Nu, Xi, Omicron, Pi, Rho, Sigma, Tau, Upsilon, Phi, Chi, Psi, Omega",
         @"A , B , \Gamma , \Delta , E , Z , H , \Theta , I , K , \Lambda , M , N , \Xi , O , \Pi , P , \Sigma , T , \Upsilon , \Phi , X , \Psi , \Omega",
@@ -172,9 +170,11 @@ public class HancomMathNormalizerTests
         DisplayName = "Spec28_Cases_OK")]
     [DataRow(
         "REL LRARROW {a} {b} , REL LRARROW {a} {}, REL lrarrow {a} {b} , REL lrarrow {a} {} , REL RARROW {a} {b} ,#\nREL RARROW {a} {}, REL rarrow {a} {b}, REL rarrow {a} {}, REL LARROW {a} {b}, REL LARROW {a} {}#\nREL larrow {a} {b} , REL larrow {a} {}, REL EXARROW {a} {b} , REL EXARROW {a} {}",
-        // BUG: LRARROW/EXARROW resolve to \xrightarrow (should be bidi).
-        "\\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , # \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xleftarrow { a } , \\xleftarrow { a } # \\xleftarrow { a } , \\xleftarrow { a } , \\xrightarrow { a } , \\xrightarrow { a }",
-        DisplayName = "Spec29_RelArrows")]
+        // LRARROW / lrarrow now → \xleftrightarrow (bidi). EXARROW (error-bar
+        // arrow, spec-specific) still falls through to \xrightarrow — no
+        // standard LaTeX analogue without a package.
+        "\\xleftrightarrow { a } , \\xleftrightarrow { a } , \\xleftrightarrow { a } , \\xleftrightarrow { a } , \\xrightarrow { a } , # \\xrightarrow { a } , \\xrightarrow { a } , \\xrightarrow { a } , \\xleftarrow { a } , \\xleftarrow { a } # \\xleftarrow { a } , \\xleftarrow { a } , \\xrightarrow { a } , \\xrightarrow { a }",
+        DisplayName = "Spec29_RelArrows_MostlyOK")]
     [DataRow(
         "LEFT (  x RIGHT ), LEFT [ x RIGHT ], LEFT { x RIGHT }, LEFT < x RIGHT >, LEFT |  x RIGHT | #\n LEFT DLINE x RIGHT DLINE, LCEIL x RCEIL, LFLOOR x RFLOOR, OVERBRACE {x+y} {b}, UNDERBRACE {a} {x+y}",
         @"\left ( x \right ) , \left [ x \right ] , \left \{ x \right \} , \left < x \right > , \left | x \right | # \left DLINE x \right DLINE , LCEIL x RCEIL , LFLOOR x RFLOOR , \overbrace{ x+y }^{ b } , \underbrace{ a }^{ x+y }",

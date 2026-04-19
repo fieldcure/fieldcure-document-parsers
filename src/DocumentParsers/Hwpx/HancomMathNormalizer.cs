@@ -358,14 +358,21 @@ internal static partial class HancomMathNormalizer
         result = BuildrelDropLowerRegex().Replace(result, "$1");
 
         // Pre-pass: REL arrow pattern before tokenization
-        //   REL rarrow {label} {} → \xrightarrow{label}
-        //   REL larrow {label} {} → \xleftarrow{label}
+        //   REL rarrow  {label} {} → \xrightarrow{label}
+        //   REL larrow  {label} {} → \xleftarrow{label}
+        //   REL lrarrow {label} {} → \xleftrightarrow{label}   (bidirectional)
+        // Check for bidi forms FIRST (lrarrow/udarrow/LRARROW/UDARROW/LRarrow/
+        // UDArrow) because those contain "rarrow" as a substring and would
+        // otherwise fall through to \xrightarrow.
         result = RelArrowRegex().Replace(result, match =>
         {
-            var arrowKw = match.Groups[1].Value;
+            var arrowKw = match.Groups[1].Value.ToLowerInvariant();
             var label   = match.Groups[2].Value.Trim();
-            var cmd = arrowKw.Contains("larrow", StringComparison.OrdinalIgnoreCase)
-                ? @"\xleftarrow" : @"\xrightarrow";
+            var cmd = arrowKw.Contains("lrarrow") || arrowKw.Contains("udarrow")
+                        ? @"\xleftrightarrow"
+                    : arrowKw.Contains("larrow")
+                        ? @"\xleftarrow"
+                        : @"\xrightarrow";
             return string.IsNullOrEmpty(label) ? $"{cmd}{{}}" : $"{cmd}{{{label}}}";
         });
 
@@ -418,6 +425,9 @@ internal static partial class HancomMathNormalizer
         // Structural transforms (order matters)
         result = ReplaceFrac(result);
         result = ReplaceRootOf(result);
+        result = ReplaceChoose(result);       // A CHOOSE B   → \binom{A}{B}
+        result = ReplaceBinomPrefix(result);  // binom A B    → \binom{A}{B}
+        result = ReplaceAtop(result);         // A atop B     → {A \atop B}
         result = ReplaceAllMatrix(result);
         result = ReplaceAllBar(result);
         result = ReplaceAllBrace(result);
@@ -545,6 +555,155 @@ internal static partial class HancomMathNormalizer
             catch (InvalidOperationException) { break; }
         }
         return s;
+    }
+
+    /// <summary>
+    /// Infix binary operator: <c>A CHOOSE B</c> → <c>\binom{A}{B}</c>.
+    /// Both operands may be a braced group or a single bare token.
+    /// </summary>
+    private static string ReplaceChoose(string s)
+        => ReplaceInfixBinary(s, " CHOOSE ", (num, den) => $@"\binom{{{num}}}{{{den}}}");
+
+    /// <summary>
+    /// Infix binary operator: <c>A atop B</c> → <c>{A \atop B}</c>.
+    /// Spec §1.2 ATOP is OVER without the fraction bar.
+    /// </summary>
+    private static string ReplaceAtop(string s)
+        => ReplaceInfixBinary(s, " atop ", (num, den) => $@"{{{num} \atop {den}}}");
+
+    /// <summary>
+    /// Prefix binary operator: <c>binom A B</c> → <c>\binom{A}{B}</c>.
+    /// Spec §1.2 shows CHOOSE and binom are equivalent, differing in syntax.
+    /// </summary>
+    private static string ReplaceBinomPrefix(string s)
+    {
+        const string keyword = "binom";
+        var searchStart = 0;
+        while (searchStart < s.Length)
+        {
+            // Match `binom` as a whole token — preceded by start/space and
+            // followed by whitespace.
+            var cursor = s.IndexOf(keyword, searchStart, StringComparison.Ordinal);
+            if (cursor < 0) break;
+            var afterKw = cursor + keyword.Length;
+            var precededByBoundary = cursor == 0 || char.IsWhiteSpace(s[cursor - 1]);
+            var followedByBoundary = afterKw < s.Length && char.IsWhiteSpace(s[afterKw]);
+            if (!precededByBoundary || !followedByBoundary)
+            {
+                searchStart = cursor + 1;
+                continue;
+            }
+
+            var (a1Start, a1End) = FindArgForward(s, afterKw);
+            if (a1Start < 0) { searchStart = afterKw; continue; }
+            var (a2Start, a2End) = FindArgForward(s, a1End);
+            if (a2Start < 0) { searchStart = afterKw; continue; }
+
+            var a1 = UnwrapBraces(s[a1Start..a1End]);
+            var a2 = UnwrapBraces(s[a2Start..a2End]);
+            s = s[..cursor] + $@"\binom{{{a1}}}{{{a2}}}" + s[a2End..];
+            searchStart = 0;
+        }
+        return s;
+    }
+
+    /// <summary>
+    /// Generic infix binary structural transform. <paramref name="keyword"/> must
+    /// include surrounding whitespace (e.g. <c>" CHOOSE "</c>).
+    /// </summary>
+    private static string ReplaceInfixBinary(string s, string keyword, Func<string, string, string> format)
+    {
+        var searchStart = 0;
+        while (searchStart < s.Length)
+        {
+            var cursor = s.IndexOf(keyword, searchStart, StringComparison.Ordinal);
+            if (cursor < 0) break;
+            var (lStart, lEnd) = FindArgBackward(s, cursor);
+            var (rStart, rEnd) = FindArgForward(s, cursor + keyword.Length);
+            if (lStart < 0 || rStart < 0)
+            {
+                searchStart = cursor + keyword.Length;
+                continue;
+            }
+            var lhs = UnwrapBraces(s[lStart..lEnd]);
+            var rhs = UnwrapBraces(s[rStart..rEnd]);
+            s = s[..lStart] + format(lhs, rhs) + s[rEnd..];
+            searchStart = 0;
+        }
+        return s;
+    }
+
+    /// <summary>
+    /// Finds the argument immediately before <paramref name="beforeIndex"/>:
+    /// a balanced <c>{ }</c> group if the prior non-space char is <c>}</c>,
+    /// otherwise a single whitespace-delimited token. Returns <c>(-1, -1)</c>
+    /// if no argument can be identified.
+    /// </summary>
+    private static (int Start, int End) FindArgBackward(string s, int beforeIndex)
+    {
+        var pos = beforeIndex - 1;
+        while (pos >= 0 && char.IsWhiteSpace(s[pos])) pos--;
+        if (pos < 0) return (-1, -1);
+
+        if (s[pos] == '}')
+        {
+            var end = pos + 1;
+            var depth = 1;
+            pos--;
+            while (pos >= 0)
+            {
+                if      (s[pos] == '}') depth++;
+                else if (s[pos] == '{') { depth--; if (depth == 0) return (pos, end); }
+                pos--;
+            }
+            return (-1, -1);
+        }
+
+        var tokenEnd = pos + 1;
+        while (pos >= 0 && !char.IsWhiteSpace(s[pos])) pos--;
+        return (pos + 1, tokenEnd);
+    }
+
+    /// <summary>
+    /// Finds the argument immediately after <paramref name="fromIndex"/>:
+    /// a balanced <c>{ }</c> group if the next non-space char is <c>{</c>,
+    /// otherwise a single whitespace-delimited token.
+    /// </summary>
+    private static (int Start, int End) FindArgForward(string s, int fromIndex)
+    {
+        var pos = fromIndex;
+        while (pos < s.Length && char.IsWhiteSpace(s[pos])) pos++;
+        if (pos >= s.Length) return (-1, -1);
+
+        if (s[pos] == '{')
+        {
+            var start = pos;
+            var depth = 1;
+            pos++;
+            while (pos < s.Length)
+            {
+                if      (s[pos] == '{') depth++;
+                else if (s[pos] == '}') { depth--; if (depth == 0) return (start, pos + 1); }
+                pos++;
+            }
+            return (-1, -1);
+        }
+
+        var tokenStart = pos;
+        while (pos < s.Length && !char.IsWhiteSpace(s[pos])) pos++;
+        return (tokenStart, pos);
+    }
+
+    /// <summary>
+    /// If <paramref name="arg"/> is wrapped in <c>{ }</c>, returns the inner
+    /// content (trimmed). Otherwise returns the input unchanged.
+    /// </summary>
+    private static string UnwrapBraces(string arg)
+    {
+        arg = arg.Trim();
+        if (arg.Length >= 2 && arg[0] == '{' && arg[^1] == '}')
+            return arg[1..^1].Trim();
+        return arg;
     }
 
     /// <summary>
