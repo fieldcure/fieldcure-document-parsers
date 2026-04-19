@@ -33,6 +33,10 @@ internal static partial class HancomMathNormalizer
             ["SMALLINTER"] = @"\cap",
             ["CUP"] = @"\cup",          ["inter"] = @"\bigcap",
             ["union"] = @"\bigcup",
+            // Spec §1.2: UNION/INTER are the big operator forms (take sub/sup).
+            // SMALLUNION/SMALLINTER are the inline (∪/∩) forms.
+            ["UNION"] = @"\bigcup",     ["INTER"] = @"\bigcap",
+            ["SMALLUNION"] = @"\cup",
             ["OPLUS"] = @"\oplus",      ["OMINUS"] = @"\ominus",
             ["OTIMES"] = @"\otimes",    ["ODIV"] = @"\oslash",
             ["ODOT"] = @"\odot",
@@ -79,6 +83,7 @@ internal static partial class HancomMathNormalizer
 
             // ── Delimiters ────────────────────────────────────────────────
             ["LEFT"] = @"\left",     ["RIGHT"] = @"\right",
+            ["left"] = @"\left",     ["right"] = @"\right",
             ["⌈"] = @"\lceil",      ["⌉"] = @"\rceil",
             ["⌊"] = @"\lfloor",     ["⌋"] = @"\rfloor",
             ["∥"] = @"\|",          ["PVER"] = @"\|",
@@ -169,6 +174,23 @@ internal static partial class HancomMathNormalizer
             ["PHI"] = @"\Phi",       ["CHI"] = "X",
             ["PSI"] = @"\Psi",       ["OMEGA"] = @"\Omega",
 
+            // ── Greek (Pascal-case) ───────────────────────────────────────
+            // Spec §1.2 mandates Pascal-case input for Greek uppercase.
+            // Ambiguous letters (A, B, E, Z, H, I, K, M, N, O, P, T, X) map
+            // to Latin since LaTeX has no dedicated \Alpha etc.
+            ["Alpha"] = "A",         ["Beta"] = "B",
+            ["Gamma"] = @"\Gamma",   ["Delta"] = @"\Delta",
+            ["Epsilon"] = "E",       ["Zeta"] = "Z",
+            ["Eta"] = "H",           ["Theta"] = @"\Theta",
+            ["Iota"] = "I",          ["Kappa"] = "K",
+            ["Lambda"] = @"\Lambda", ["Mu"] = "M",
+            ["Nu"] = "N",            ["Xi"] = @"\Xi",
+            ["Omicron"] = "O",       ["Pi"] = @"\Pi",
+            ["Rho"] = "P",           ["Sigma"] = @"\Sigma",
+            ["Tau"] = "T",           ["Upsilon"] = @"\Upsilon",
+            ["Phi"] = @"\Phi",       ["Chi"] = "X",
+            ["Psi"] = @"\Psi",       ["Omega"] = @"\Omega",
+
             // ── Trig / Functions ──────────────────────────────────────────
             ["log"] = @"\log",       ["ln"] = @"\ln",
             ["sin"] = @"\sin",       ["cos"] = @"\cos",
@@ -177,6 +199,11 @@ internal static partial class HancomMathNormalizer
             // ── HWPX-specific ─────────────────────────────────────────────
             // OVER: HWPX uses uppercase; normalize to lowercase for ReplaceFrac
             ["OVER"] = "over",
+            // from / to — Hancom structural keywords for limits on big operators
+            // (int, sum, prod, lim, …). Render as _/^. Spec §1.2 lim example:
+            //   "y = lim _{x -> 0} {1 over x}"  — uses native _/^ form,
+            // but "int from A to B" is equally valid and maps identically.
+            ["from"] = "_",            ["to"] = "^",
             // UNDEROVER: structural keyword before nary symbol (∫, ∑ …).
             // Removing it leaves the symbol to naturally take _ and ^ limits.
             ["UNDEROVER"] = "",
@@ -258,6 +285,11 @@ internal static partial class HancomMathNormalizer
         // Remove Hancom accessibility prefix
         var result = script.Replace("수식입니다.", "").Trim();
 
+        // Pre-pass: BUILDREL drops the lower-label arm (spec §1.2). Strip any
+        // trailing {lower} group so the upper label is all RelArrowRegex sees.
+        //   BUILDREL <arrow> {upper} {lower} → BUILDREL <arrow> {upper}
+        result = BuildrelDropLowerRegex().Replace(result, "$1");
+
         // Pre-pass: REL arrow pattern before tokenization
         //   REL rarrow {label} {} → \xrightarrow{label}
         //   REL larrow {label} {} → \xleftarrow{label}
@@ -270,13 +302,16 @@ internal static partial class HancomMathNormalizer
             return string.IsNullOrEmpty(label) ? $"{cmd}{{}}" : $"{cmd}{{{label}}}";
         });
 
-        // Tokenize: backticks → space; pad braces, pipes and & with spaces
+        // Tokenize: backticks → space; pad braces, pipes, & and , with spaces
         // | must be padded so that "RIGHT |LEFT" doesn't merge into "|LEFT" token
+        // , must be padded so keywords like "alpha, beta" tokenize as
+        //   [alpha] [,] [beta] instead of [alpha,] [beta] (unmatched in map)
         result = result.Replace("`", " ")
                        .Replace("{", " { ")
                        .Replace("}", " } ")
                        .Replace("|", " | ")
-                       .Replace("&", " & ");
+                       .Replace("&", " & ")
+                       .Replace(",", " , ");
 
         var tokens = result.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                            .ToList();
@@ -371,9 +406,10 @@ internal static partial class HancomMathNormalizer
     private static string ReplaceFrac(string s)
     {
         const string keyword = " over ";
-        while (true)
+        var searchStart = 0;
+        while (searchStart < s.Length)
         {
-            var cursor = s.IndexOf(keyword, StringComparison.Ordinal);
+            var cursor = s.IndexOf(keyword, searchStart, StringComparison.Ordinal);
             if (cursor < 0) break;
             try
             {
@@ -382,8 +418,15 @@ internal static partial class HancomMathNormalizer
                 var numerator = s[numStart..numEnd];
                 var after     = s[(cursor + keyword.Length)..];
                 s = before + @"\frac" + numerator + " " + after;
+                searchStart = 0; // string changed — restart from beginning
             }
-            catch (InvalidOperationException) { break; }
+            catch (InvalidOperationException)
+            {
+                // No braced numerator at this spot (e.g. `a over b` without braces).
+                // Skip past this keyword occurrence and keep searching — later
+                // occurrences may still be braced.
+                searchStart = cursor + keyword.Length;
+            }
         }
         return s;
     }
@@ -393,21 +436,33 @@ internal static partial class HancomMathNormalizer
     /// </summary>
     private static string ReplaceRootOf(string s)
     {
-        const string rootKw = " root ";
+        const string rootKw = "root ";   // no leading space — checked separately
         const string ofKw   = " of ";
         while (true)
         {
-            var rootPos = s.IndexOf(rootKw, StringComparison.Ordinal);
+            // Find `root ` either at position 0 or preceded by whitespace.
+            // Previously the keyword was " root " which made position 0 unreachable
+            // (single-equation input starting with `root {n} of {x}` was missed).
+            var rootPos = -1;
+            var scan = 0;
+            while (scan < s.Length)
+            {
+                var p = s.IndexOf(rootKw, scan, StringComparison.Ordinal);
+                if (p < 0) break;
+                if (p == 0 || char.IsWhiteSpace(s[p - 1])) { rootPos = p; break; }
+                scan = p + 1;
+            }
             if (rootPos < 0) break;
+
             var ofPos = s.IndexOf(ofKw, rootPos + rootKw.Length, StringComparison.Ordinal);
             if (ofPos < 0) break;
             try
             {
-                var (s1, e1) = FindBracketsForward(s, rootPos + 1);
+                var (s1, e1) = FindBracketsForward(s, rootPos + rootKw.Length);
                 var (s2, e2) = FindBracketsForward(s, ofPos + 1);
                 var n    = s[(s1 + 1)..(e1 - 1)];
                 var expr = s[(s2 + 1)..(e2 - 1)];
-                s = s[..rootPos] + @" \sqrt[" + n + "]{" + expr + "}" + s[e2..];
+                s = s[..rootPos] + @"\sqrt[" + n + "]{" + expr + "}" + s[e2..];
             }
             catch (InvalidOperationException) { break; }
         }
@@ -518,6 +573,12 @@ internal static partial class HancomMathNormalizer
 
     [GeneratedRegex(@"REL\s+(\w+arrow)\s+\{([^}]*)\}\s+\{[^}]*\}", RegexOptions.IgnoreCase)]
     private static partial Regex RelArrowRegex();
+
+    // Captures `BUILDREL <arrow> {upper}` in $1; the trailing `\s+\{[^}]*\}`
+    // (the lower label) is outside the capture group so Replace("$1") drops it.
+    // IgnoreCase intentionally off — `BUILDREL` is uppercase per spec §1.2.
+    [GeneratedRegex(@"(BUILDREL\s+\S+\s+\{[^}]*\})\s+\{[^}]*\}")]
+    private static partial Regex BuildrelDropLowerRegex();
 
     [GeneratedRegex(@"\s{2,}")]
     private static partial Regex MultiSpaceRegex();
