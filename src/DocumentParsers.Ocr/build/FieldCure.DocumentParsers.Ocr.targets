@@ -1,7 +1,12 @@
 <Project>
   <!-- Tesseract native DLLs — filenames are version-specific.
        When upgrading Tesseract, update both this file AND the csproj <ItemGroup>
-       (e.g., tesseract50.dll → tesseract53.dll, leptonica version may also change). -->
+       (e.g., tesseract50.dll → tesseract53.dll, leptonica version may also change).
+
+       See DocumentParsers.Ocr.csproj for the full rationale on why this uses
+       "x64/" + targets instead of the runtimes/<rid>/native/ convention.
+       TL;DR: PackAsTool consumers need the tools/<tfm>/<arch>/ layout, which
+       runtimes/ does not provide. -->
 
   <!-- Build time: copy native DLLs to output x64/ -->
   <ItemGroup>

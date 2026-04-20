@@ -22,7 +22,23 @@ jobs:
         run: |
           MESSAGE="${{ github.event.head_commit.message }}"
 
-          # "Release vX.X.X" — all packages with same version
+          normalize_name() {
+            case "$1" in
+              DocumentParsers|FieldCure.DocumentParsers)
+                echo "DocumentParsers|FieldCure.DocumentParsers|RELEASENOTES.DocumentParsers.md"
+                ;;
+              Imaging|DocumentParsers.Imaging|FieldCure.DocumentParsers.Imaging)
+                echo "DocumentParsers.Imaging|FieldCure.DocumentParsers.Imaging|RELEASENOTES.DocumentParsers.Imaging.md"
+                ;;
+              Ocr|DocumentParsers.Ocr|FieldCure.DocumentParsers.Ocr)
+                echo "DocumentParsers.Ocr|FieldCure.DocumentParsers.Ocr|RELEASENOTES.DocumentParsers.Ocr.md"
+                ;;
+              *)
+                return 1
+                ;;
+            esac
+          }
+
           if echo "$MESSAGE" | grep -qE '^Release v[0-9]'; then
             VERSION=$(echo "$MESSAGE" | sed -n 's/Release v\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
             TAG="v${VERSION}"
@@ -34,39 +50,47 @@ jobs:
               echo ""
               echo "---"
               echo ""
-              echo "# DocumentParsers.Pdf"
+              echo "# DocumentParsers.Imaging"
               echo ""
-              cat RELEASENOTES.DocumentParsers.Pdf.md
+              cat RELEASENOTES.DocumentParsers.Imaging.md
               echo ""
               echo "---"
               echo ""
-              echo "# DocumentParsers.Pdf.Ocr"
+              echo "# DocumentParsers.Ocr"
               echo ""
-              cat RELEASENOTES.DocumentParsers.Pdf.Ocr.md
+              cat RELEASENOTES.DocumentParsers.Ocr.md
             } > RELEASE_BODY.md
 
             gh release create "$TAG" \
               --title "v${VERSION}" \
               --notes-file RELEASE_BODY.md
           else
-            # "Release Name1 vX.X.X [Name2 vX.X.X ...]"
-            # Extract all "Name vX.X.X" pairs
             PAIRS=$(echo "$MESSAGE" | grep -oE '[A-Za-z][A-Za-z0-9.]*\s+v[0-9]+\.[0-9]+\.[0-9]+')
 
             echo "$PAIRS" | while IFS= read -r pair; do
-              NAME=$(echo "$pair" | awk '{print $1}')
-              VERSION=$(echo "$pair" | sed 's/.*v//')
-              TAG="$(echo "$NAME" | tr '[:upper:]' '[:lower:]')-v${VERSION}"
+              [ -z "$pair" ] && continue
 
-              NOTES_FILE="RELEASENOTES.${NAME}.md"
-              if [ ! -f "$NOTES_FILE" ]; then
-                echo "::warning::$NOTES_FILE not found, skipping $NAME"
+              RAW_NAME=$(echo "$pair" | awk '{print $1}')
+              VERSION=$(echo "$pair" | sed 's/.*v//')
+
+              if ! META=$(normalize_name "$RAW_NAME"); then
+                echo "::warning::Unknown package name '$RAW_NAME', skipping"
                 continue
               fi
 
-              echo "Creating release: $NAME v$VERSION (tag: $TAG)"
+              SLUG=$(echo "$META" | cut -d'|' -f1)
+              TITLE=$(echo "$META" | cut -d'|' -f2)
+              NOTES_FILE=$(echo "$META" | cut -d'|' -f3)
+              TAG="$(echo "$SLUG" | tr '[:upper:]' '[:lower:]')-v${VERSION}"
+
+              if [ ! -f "$NOTES_FILE" ]; then
+                echo "::warning::$NOTES_FILE not found, skipping $RAW_NAME"
+                continue
+              fi
+
+              echo "Creating release: $TITLE v$VERSION (tag: $TAG)"
               gh release create "$TAG" \
-                --title "${NAME} v${VERSION}" \
+                --title "$TITLE v${VERSION}" \
                 --notes-file "$NOTES_FILE"
             done
           fi

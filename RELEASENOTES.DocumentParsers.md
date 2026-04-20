@@ -1,5 +1,40 @@
 # Release Notes — FieldCure.DocumentParsers
 
+## [2.0.0] - 2026-04-20
+
+### Breaking Changes
+- **PDF text extraction promoted to the core package.** `PdfParser` is now auto-registered in `DocumentParserFactory` for `.pdf` — no extension call required.
+- **Package topology reorganized.** `FieldCure.DocumentParsers.Pdf` (v1.1.0) is deprecated in favour of:
+  - Core (this package) — text extraction for DOCX/HWPX/XLSX/PPTX/HTML/**PDF** via OpenXml + **PdfPig** (pure managed, no native binaries).
+  - `FieldCure.DocumentParsers.Imaging` (new) — PDF page image rendering via PDFtoImage (PDFium).
+  - `FieldCure.DocumentParsers.Ocr` (replaces `.Pdf.Ocr`) — Tesseract OCR fallback for scanned PDFs.
+- **Namespace change.** `FieldCure.DocumentParsers.Pdf.PdfParser` → `FieldCure.DocumentParsers.PdfParser`.
+- **`AddPdfSupport()` removed.** Core auto-registers PDF; the extension method is no longer needed.
+- **`PdfParser` no longer implements `IMediaDocumentParser`.** For page image rendering, register `PdfImageRenderer` from the Imaging package.
+- **OCR fallback moved out of `PdfParser`.** The `PdfParser(IOcrEngine)` overload is removed. Use `OcrPdfParser` from the Ocr package instead.
+
+### Migration (from 1.1.0)
+```csharp
+// Before
+using FieldCure.DocumentParsers.Pdf;
+DocumentParserFactoryExtensions.AddPdfSupport();
+
+// After (text only) — nothing to register
+using FieldCure.DocumentParsers;
+var parser = DocumentParserFactory.GetParser(".pdf");
+
+// After (with images)
+using FieldCure.DocumentParsers.Imaging;
+DocumentParserFactoryImagingExtensions.AddImagingSupport();
+
+// After (with OCR)
+using FieldCure.DocumentParsers.Ocr;
+using var ocr = DocumentParserFactoryOcrExtensions.AddOcrSupport();
+```
+
+### Added
+- Core now depends on `PdfPig` 0.1.* for PDF text extraction.
+
 ## [1.1.0] - 2026-04-07
 
 ### Added

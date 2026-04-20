@@ -1,14 +1,10 @@
-namespace FieldCure.DocumentParsers.Pdf.Ocr.Tests;
+namespace FieldCure.DocumentParsers.Ocr.Tests;
 
 [TestClass]
-public class PdfParserOcrFallbackTests
+public class OcrPdfParserTests
 {
     private static readonly string TestDataDir =
         Path.Combine(AppContext.BaseDirectory, "TestData");
-
-    private static readonly string SiblingPdfTestDataDir =
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
-            "DocumentParsers.Pdf.Tests", "TestData");
 
     private static byte[] ReadBytes(string filename)
         => File.ReadAllBytes(Path.Combine(TestDataDir, filename));
@@ -20,7 +16,7 @@ public class PdfParserOcrFallbackTests
     public void ExtractText_ScannedEnglishPdf_ReturnsOcrText()
     {
         using var engine = new TesseractOcrEngine();
-        var parser = new PdfParser(engine);
+        var parser = new OcrPdfParser(engine);
 
         var text = parser.ExtractText(ReadBytes("scanned_english.pdf"));
 
@@ -37,7 +33,7 @@ public class PdfParserOcrFallbackTests
     public void ExtractText_ScannedKoreanPdf_ReturnsOcrText()
     {
         using var engine = new TesseractOcrEngine();
-        var parser = new PdfParser(engine);
+        var parser = new OcrPdfParser(engine);
 
         var text = parser.ExtractText(ReadBytes("scanned_korean.pdf"));
 
@@ -54,7 +50,7 @@ public class PdfParserOcrFallbackTests
     public void ExtractText_ScannedMixedPdf_ReturnsOcrText()
     {
         using var engine = new TesseractOcrEngine();
-        var parser = new PdfParser(engine);
+        var parser = new OcrPdfParser(engine);
 
         var text = parser.ExtractText(ReadBytes("scanned_mixed.pdf"));
 
@@ -69,10 +65,10 @@ public class PdfParserOcrFallbackTests
     #region Text PDF — no OCR needed
 
     [TestMethod]
-    [Description("Text PDF must not trigger OCR — output should match non-OCR parser.")]
-    public void ExtractText_TextPdf_MatchesNonOcrOutput()
+    [Description("Text PDF must not trigger OCR — output should match core PdfParser.")]
+    public void ExtractText_TextPdf_MatchesCoreParserOutput()
     {
-        var pdfPath = Path.Combine(SiblingPdfTestDataDir, "sample_math_equations.pdf");
+        var pdfPath = Path.Combine(TestDataDir, "sample_math_equations.pdf");
         if (!File.Exists(pdfPath))
         {
             Assert.Inconclusive("sample_math_equations.pdf not found.");
@@ -81,22 +77,22 @@ public class PdfParserOcrFallbackTests
 
         var data = File.ReadAllBytes(pdfPath);
 
-        var baseParser = new PdfParser();
         using var engine = new TesseractOcrEngine();
-        var ocrParser = new PdfParser(engine);
+        var ocrParser = new OcrPdfParser(engine);
+        var coreParser = new PdfParser();
 
-        var baseText = baseParser.ExtractText(data);
+        var coreText = coreParser.ExtractText(data);
         var ocrText = ocrParser.ExtractText(data);
 
-        Assert.AreEqual(baseText, ocrText,
-            "Text PDF should produce identical output with or without OCR engine.");
+        Assert.AreEqual(coreText, ocrText,
+            "Text PDF should produce identical output via core and OCR-augmented parser.");
     }
 
     [TestMethod]
     [Description("OCR engine must not be called when PdfPig extracts meaningful text.")]
     public void ExtractText_TextPdf_DoesNotCallOcr()
     {
-        var pdfPath = Path.Combine(SiblingPdfTestDataDir, "sample_math_equations.pdf");
+        var pdfPath = Path.Combine(TestDataDir, "sample_math_equations.pdf");
         if (!File.Exists(pdfPath))
         {
             Assert.Inconclusive("sample_math_equations.pdf not found.");
@@ -105,7 +101,7 @@ public class PdfParserOcrFallbackTests
 
         var data = File.ReadAllBytes(pdfPath);
         var mockEngine = new MockOcrEngine();
-        var parser = new PdfParser(mockEngine);
+        var parser = new OcrPdfParser(mockEngine);
 
         parser.ExtractText(data);
 
@@ -115,11 +111,11 @@ public class PdfParserOcrFallbackTests
 
     #endregion
 
-    #region Scanned PDF without OCR engine — empty text
+    #region Scanned PDF via core PdfParser (no OCR) — headers only
 
     [TestMethod]
-    [Description("Scanned PDF without OCR engine should return only page headers.")]
-    public void ExtractText_ScannedPdf_WithoutOcrEngine_ReturnsOnlyHeaders()
+    [Description("Scanned PDF via core PdfParser (no OCR) should return only page headers.")]
+    public void CorePdfParser_ScannedPdf_ReturnsOnlyHeaders()
     {
         var parser = new PdfParser();
         var text = parser.ExtractText(ReadBytes("scanned_english.pdf"));
@@ -127,11 +123,10 @@ public class PdfParserOcrFallbackTests
         Assert.IsTrue(text.Contains("## Page 1"),
             "Should have page header.");
 
-        // Without OCR, scanned PDF should yield very little text
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var nonHeaderLines = lines.Where(l => !l.StartsWith("## Page")).ToList();
         Assert.AreEqual(0, nonHeaderLines.Count,
-            "Scanned PDF without OCR should have no text content besides page headers.");
+            "Scanned PDF via core parser should have no text content besides page headers.");
     }
 
     #endregion
@@ -139,16 +134,34 @@ public class PdfParserOcrFallbackTests
     #region Factory registration
 
     [TestMethod]
-    [Description("AddPdfOcrSupport must register a PDF parser with the factory.")]
-    public void AddPdfOcrSupport_RegistersParser()
+    [Description("AddOcrSupport must register an OcrPdfParser with the factory.")]
+    public void AddOcrSupport_RegistersParser()
     {
-        using var engine = DocumentParserFactoryOcrExtensions.AddPdfOcrSupport();
+        using var engine = DocumentParserFactoryOcrExtensions.AddOcrSupport();
 
         var parser = DocumentParserFactory.GetParser(".pdf");
-        Assert.IsNotNull(parser, "Factory should resolve .pdf after AddPdfOcrSupport().");
+        Assert.IsInstanceOfType<OcrPdfParser>(parser,
+            "Factory should resolve .pdf to OcrPdfParser after AddOcrSupport().");
 
-        // Clean up: re-register without OCR to avoid side effects on other tests
-        DocumentParserFactoryExtensions.AddPdfSupport();
+        // Restore core default for other tests.
+        DocumentParserFactory.Register(new PdfParser());
+    }
+
+    [TestMethod]
+    [Description("AddOcrSupport(IOcrEngine) allows caller to inject a custom engine.")]
+    public void AddOcrSupport_WithCustomEngine_Registers()
+    {
+        var mock = new MockOcrEngine();
+        DocumentParserFactoryOcrExtensions.AddOcrSupport(mock);
+        try
+        {
+            var parser = DocumentParserFactory.GetParser(".pdf");
+            Assert.IsInstanceOfType<OcrPdfParser>(parser);
+        }
+        finally
+        {
+            DocumentParserFactory.Register(new PdfParser());
+        }
     }
 
     #endregion

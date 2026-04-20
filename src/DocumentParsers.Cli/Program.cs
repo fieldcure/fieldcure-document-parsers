@@ -1,15 +1,11 @@
 using System.Text;
 using FieldCure.DocumentParsers;
-using FieldCure.DocumentParsers.Pdf;
 
 Console.OutputEncoding = Encoding.UTF8;
 
-// Register PDF support
-DocumentParserFactoryExtensions.AddPdfSupport();
-
 if (args.Length == 0 || args[0] is "-h" or "--help")
 {
-    Console.Error.WriteLine("Usage: DocumentParsers.Cli <file-path> [output-path]");
+    Console.Error.WriteLine("Usage: FieldCure.DocumentParsers.Cli <file-path> [output-path]");
     Console.Error.WriteLine();
     Console.Error.WriteLine("  file-path    Document to extract text from");
     Console.Error.WriteLine("  output-path  Optional. Write UTF-8 output to file instead of stdout");
@@ -40,6 +36,18 @@ var outputPath = args.Length > 1 ? args[1] : null;
 
 if (outputPath is not null)
 {
+    var outExt = Path.GetExtension(outputPath);
+    if (outExt is not "" and not ".md" and not ".txt")
+    {
+        Console.Error.WriteLine($"Warning: output is Markdown text, but extension is '{outExt}'");
+    }
+
+    if (Path.GetFullPath(outputPath) == Path.GetFullPath(filePath))
+    {
+        Console.Error.WriteLine("Error: output path is the same as input file.");
+        return 1;
+    }
+
     await File.WriteAllTextAsync(outputPath, text, Encoding.UTF8);
     Console.Error.WriteLine($"Written to {outputPath}");
 }

@@ -1,8 +1,8 @@
 # FieldCure.DocumentParsers
 
-[![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers)](https://www.nuget.org/packages/FieldCure.DocumentParsers)
-[![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Pdf)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf)
-[![NuGet](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Pdf.Ocr)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf.Ocr)
+[![Core](https://img.shields.io/nuget/v/FieldCure.DocumentParsers?label=Core)](https://www.nuget.org/packages/FieldCure.DocumentParsers)
+[![Imaging](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Imaging?label=Imaging)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Imaging)
+[![Ocr](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Ocr?label=Ocr)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Ocr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Lightweight document-to-text extraction library for .NET.
@@ -16,29 +16,33 @@ with heading detection and table support — designed for LLM/RAG pipelines.
 - **XLSX** — sheets → markdown tables (multi-sheet support), metadata → YAML front matter
 - **PPTX** — slide text, speaker notes, slide tables → markdown, grouped shapes, metadata → YAML front matter
 - **HTML** — readable content extraction (SmartReader) → GitHub-flavored Markdown (ReverseMarkdown)
-- **PDF** — text extraction (PdfPig) + page image rendering (PDFtoImage) — separate package
+- **PDF** — text extraction (PdfPig, pure managed). Page image rendering and OCR are separate opt-in packages.
 
 ## Packages
 
-| Package | Description | Dependencies |
-|---------|-------------|:------------:|
-| `FieldCure.DocumentParsers` | DOCX, HWPX, XLSX, PPTX, HTML | DocumentFormat.OpenXml, SmartReader, ReverseMarkdown |
-| `FieldCure.DocumentParsers.Pdf` | PDF text + images | PdfPig, PDFtoImage |
-| `FieldCure.DocumentParsers.Pdf.Ocr` | Tesseract OCR for scanned PDFs | Tesseract (eng + kor) |
+| Package | Description | Native deps |
+|---------|-------------|:-----------:|
+| `FieldCure.DocumentParsers` | DOCX, HWPX, XLSX, PPTX, HTML, **PDF** (text) | — |
+| `FieldCure.DocumentParsers.Imaging` | PDF → page images (adds `IMediaDocumentParser`) | PDFium |
+| `FieldCure.DocumentParsers.Ocr` | Tesseract OCR fallback for scanned PDFs — **Windows only** | PDFium + Tesseract |
 
-PDF and OCR are separate packages to keep the core lightweight (no native binaries).
+The core package is pure managed — no native binaries are pulled in unless you opt into Imaging or Ocr.
+
+> The Ocr package is currently **Windows only** — the bundled Tesseract 5.2.0 ships native Windows binaries only. The assembly carries `[SupportedOSPlatform("windows")]`, so non-Windows consumers will see CA1416 warnings at compile time. Cross-platform OCR is on the roadmap; in the meantime use the core package directly for PDFs that have an embedded text layer (works everywhere).
+
+> **Deprecated (v2.0):** `FieldCure.DocumentParsers.Pdf` (replaced by core + Imaging) and `FieldCure.DocumentParsers.Pdf.Ocr` (renamed to `.Ocr`).
 
 ## Installation
 
 ```bash
-# Core (DOCX, HWPX, XLSX, PPTX)
+# Core (DOCX, HWPX, XLSX, PPTX, HTML, PDF text)
 dotnet add package FieldCure.DocumentParsers
 
-# PDF support (optional)
-dotnet add package FieldCure.DocumentParsers.Pdf
+# PDF page rendering (optional, pulls PDFium)
+dotnet add package FieldCure.DocumentParsers.Imaging
 
-# PDF + OCR for scanned PDFs (optional)
-dotnet add package FieldCure.DocumentParsers.Pdf.Ocr
+# OCR fallback for scanned PDFs (optional, pulls Tesseract + PDFium)
+dotnet add package FieldCure.DocumentParsers.Ocr
 ```
 
 ## Quick Start
@@ -46,18 +50,14 @@ dotnet add package FieldCure.DocumentParsers.Pdf.Ocr
 ```csharp
 using FieldCure.DocumentParsers;
 
-// Get parser by file extension
-var parser = DocumentParserFactory.GetParser(".docx");
-if (parser is not null)
-{
-    var bytes = File.ReadAllBytes("document.docx");
-    var text = parser.ExtractText(bytes);
-    Console.WriteLine(text);
-}
+// PDF is now registered automatically — no AddPdfSupport() call needed.
+var parser = DocumentParserFactory.GetParser(".pdf");
+var text = parser!.ExtractText(File.ReadAllBytes("document.pdf"));
 
-// Check supported extensions
-var extensions = DocumentParserFactory.SupportedExtensions;
-// .docx, .hwpx, .xlsx, .pptx, .html, .htm
+// Same API for all formats
+foreach (var ext in DocumentParserFactory.SupportedExtensions)
+    Console.WriteLine(ext);
+// .docx, .hwpx, .xlsx, .pptx, .html, .htm, .pdf
 ```
 
 ```csharp
@@ -68,27 +68,27 @@ var options = new ExtractionOptions
     IncludeMetadata = false,
     IncludeFootnotes = false
 };
-var text = parser.ExtractText(bytes, options);
+var text = parser.ExtractText(File.ReadAllBytes("report.docx"), options);
 ```
 
 ```csharp
-using FieldCure.DocumentParsers.Pdf;
+using FieldCure.DocumentParsers;
+using FieldCure.DocumentParsers.Imaging;
 
-// Register PDF support (call once at startup)
-DocumentParserFactoryExtensions.AddPdfSupport();
-
-// Extract PDF pages as images
-var pdfParser = (IMediaDocumentParser)DocumentParserFactory.GetParser(".pdf")!;
-var images = pdfParser.ExtractImages(File.ReadAllBytes("document.pdf"), dpi: 150);
+// Upgrade the factory's .pdf entry to IMediaDocumentParser (text + images).
+DocumentParserFactoryImagingExtensions.AddImagingSupport();
+var pdf = (IMediaDocumentParser)DocumentParserFactory.GetParser(".pdf")!;
+var images = pdf.ExtractImages(File.ReadAllBytes("document.pdf"), dpi: 150);
 ```
 
 ```csharp
-using FieldCure.DocumentParsers.Pdf.Ocr;
+using FieldCure.DocumentParsers;
+using FieldCure.DocumentParsers.Ocr;
 
-// Register PDF with OCR fallback for scanned PDFs (call once at startup)
-using var ocrEngine = DocumentParserFactoryOcrExtensions.AddPdfOcrSupport();
+// Register an OCR-augmented PDF parser. Dispose the engine at shutdown.
+using var ocr = DocumentParserFactoryOcrExtensions.AddOcrSupport();
 
-// Scanned pages are automatically OCR'd when text extraction yields no content
+// Scanned pages are OCR'd; pages with an embedded text layer go through PdfPig.
 var parser = DocumentParserFactory.GetParser(".pdf")!;
 var text = parser.ExtractText(File.ReadAllBytes("scanned.pdf"));
 ```
@@ -123,6 +123,8 @@ All parsers convert tables to markdown format for LLM comprehension:
 | Alice | 30 | Seoul |
 | Bob | 25 | Busan |
 ```
+
+Pipe characters inside cells are escaped as `\|` to preserve table structure.
 
 ## Limitations
 
@@ -190,32 +192,33 @@ All parsers convert tables to markdown format for LLM comprehension:
 | Tables, headings, links preserved | Embedded media extraction |
 | Nav / ads / footer auto-removal | Non-UTF-8 encodings |
 
-### PDF (separate package)
+### PDF
 
 | Supported | Not Yet Supported |
 |-----------|-------------------|
-| Text extraction (text-based PDF) | Form field extraction |
-| Page image rendering | Digital signature info |
-| Multi-page documents | PDF/A validation |
-| Unicode text | |
-| OCR fallback for scanned PDFs (Pdf.Ocr) | |
-| English + Korean OCR (tessdata_fast) | |
+| Text extraction (text-based PDF) — core package | Form field extraction |
+| Page image rendering — `Imaging` package | Digital signature info |
+| OCR fallback for scanned PDFs — `Ocr` package | PDF/A validation |
+| Multi-page documents, Unicode text | |
+| English + Korean OCR (tessdata_fast) — `Ocr` | |
 
 ## Repository Structure
 
+All library projects multi-target `net8.0;net10.0`.
+
 ```
 src/
-├── DocumentParsers/                FieldCure.DocumentParsers (net8.0)
-│   ├── Ooxml/                      DocxParser, PptxParser, XlsxParser
-│   ├── Hwpx/                       HwpxParser
-│   └── Html/                       HtmlParser
-├── DocumentParsers.Pdf/            FieldCure.DocumentParsers.Pdf (net8.0)
-├── DocumentParsers.Pdf.Ocr/        FieldCure.DocumentParsers.Pdf.Ocr (net8.0)
-├── DocumentParsers.Cli/            Console tool for manual output inspection
-├── DocumentParsers.Tests/          MSTest — 138 tests
-├── DocumentParsers.Pdf.Tests/      MSTest — 11 tests
-└── DocumentParsers.Pdf.Ocr.Tests/  MSTest — 19 tests
-                                    Total: 168 tests
+├── DocumentParsers/                     FieldCure.DocumentParsers 2.0 (net8.0 + net10.0)
+│   ├── Ooxml/                           DocxParser, PptxParser, XlsxParser
+│   ├── Hwpx/                            HwpxParser
+│   ├── Html/                            HtmlParser
+│   └── Pdf/                             PdfParser (text via PdfPig)
+├── DocumentParsers.Imaging/             FieldCure.DocumentParsers.Imaging 1.0 (net8.0 + net10.0)
+├── DocumentParsers.Ocr/                 FieldCure.DocumentParsers.Ocr 1.0 (net8.0 + net10.0)
+├── DocumentParsers.Cli/                 Console tool for manual output inspection
+├── DocumentParsers.Tests/               MSTest — core + PdfParser tests
+├── DocumentParsers.Imaging.Tests/       MSTest — PdfImageRenderer tests
+└── DocumentParsers.Ocr.Tests/           MSTest — OcrPdfParser + TesseractOcrEngine tests
 ```
 
 ## Build & Test
@@ -232,8 +235,8 @@ Part of the [AssistStudio ecosystem](https://github.com/fieldcure/fieldcure-assi
 ## Release Notes
 
 - [FieldCure.DocumentParsers](RELEASENOTES.DocumentParsers.md)
-- [FieldCure.DocumentParsers.Pdf](RELEASENOTES.DocumentParsers.Pdf.md)
-- [FieldCure.DocumentParsers.Pdf.Ocr](RELEASENOTES.DocumentParsers.Pdf.Ocr.md)
+- [FieldCure.DocumentParsers.Imaging](RELEASENOTES.DocumentParsers.Imaging.md)
+- [FieldCure.DocumentParsers.Ocr](RELEASENOTES.DocumentParsers.Ocr.md)
 
 ## License
 

@@ -41,6 +41,14 @@ public class DocumentParserFactoryTests
 
     [TestMethod]
     [DataRow(".pdf")]
+    [DataRow(".PDF")]
+    public void GetParser_Pdf_ReturnsPdfParser(string ext)
+    {
+        var parser = DocumentParserFactory.GetParser(ext);
+        Assert.IsInstanceOfType<PdfParser>(parser);
+    }
+
+    [TestMethod]
     [DataRow(".txt")]
     [DataRow(".xyz")]
     [DataRow("")]
@@ -58,13 +66,29 @@ public class DocumentParserFactoryTests
         CollectionAssert.Contains(extensions, ".hwpx");
         CollectionAssert.Contains(extensions, ".xlsx");
         CollectionAssert.Contains(extensions, ".pptx");
+        CollectionAssert.Contains(extensions, ".pdf");
     }
 
     [TestMethod]
-    public void Register_AddsParserForExtension()
+    public void Register_OverridesExistingParser()
     {
-        // Register returns parser for previously unsupported extension
-        var parser = DocumentParserFactory.GetParser(".pdf");
-        Assert.IsNull(parser, "PDF should not be registered by default (separate package)");
+        // Register replaces any existing parser for that extension.
+        var custom = new CustomPdfParser();
+        DocumentParserFactory.Register(custom);
+        try
+        {
+            Assert.AreSame(custom, DocumentParserFactory.GetParser(".pdf"));
+        }
+        finally
+        {
+            // Restore default so subsequent tests are unaffected.
+            DocumentParserFactory.Register(new PdfParser());
+        }
+    }
+
+    private sealed class CustomPdfParser : IDocumentParser
+    {
+        public IReadOnlyList<string> SupportedExtensions => [".pdf"];
+        public string ExtractText(byte[] data) => string.Empty;
     }
 }

@@ -1,6 +1,6 @@
 # FieldCure.DocumentParsers
 
-**Lightweight document text extraction for .NET** — DOCX, HWPX, XLSX, PPTX, HTML, and more. Structured Markdown output for LLM / RAG consumption.
+**Lightweight document text extraction for .NET** — DOCX, HWPX, XLSX, PPTX, HTML, and PDF. Structured Markdown output for LLM / RAG consumption. Pure managed, no native binaries.
 
 ## Features
 
@@ -9,12 +9,13 @@
 - **XLSX** — Sheets as markdown tables, metadata → YAML
 - **PPTX** — Slide text, tables, speaker notes, metadata → YAML
 - **HTML** — Readable content extraction via SmartReader → GitHub-flavored Markdown via ReverseMarkdown
+- **PDF** — Page-by-page text extraction via PdfPig with `## Page {n}` headers (auto-registered)
 - **Math equations** — DOCX (`m:oMath`) and HWPX (`hp:equation`) converted to `[math: LaTeX]`
 - **Metadata** — YAML front matter (`title`, `author`, `created`, `modified`, `subject`, `keywords`, `description`)
 - **Footnotes / Endnotes** — `[^N]` / `[^enN]` inline references with definition sections
 - **Comments** — Inline blockquote `> **[Comment — author]:**` format
 - **Factory pattern** — `DocumentParserFactory.GetParser(".docx")` returns the right parser
-- **Zero platform dependency** — Targets `net8.0`, no Windows-specific APIs
+- **Zero platform dependency** — Targets `net8.0` and `net10.0`, no native binaries, no Windows-specific APIs
 - **Extensible** — Implement `IDocumentParser` and call `DocumentParserFactory.Register()`
 
 ## Install
@@ -28,18 +29,18 @@ dotnet add package FieldCure.DocumentParsers
 ```csharp
 using FieldCure.DocumentParsers;
 
-// Auto-detect parser by extension
-var parser = DocumentParserFactory.GetParser(".docx");
+// Auto-detect parser by extension — PDF is registered out of the box.
+var parser = DocumentParserFactory.GetParser(".pdf");
 if (parser is not null)
 {
-    var bytes = File.ReadAllBytes("report.docx");
+    var bytes = File.ReadAllBytes("report.pdf");
     var text = parser.ExtractText(bytes);
     Console.WriteLine(text);
 }
 
 // Check all supported extensions
 foreach (var ext in DocumentParserFactory.SupportedExtensions)
-    Console.WriteLine(ext);  // .docx, .hwpx, .xlsx, .pptx, .html, .htm
+    Console.WriteLine(ext);  // .docx, .hwpx, .xlsx, .pptx, .html, .htm, .pdf
 
 // Opt-out control for metadata, footnotes, etc.
 var docxParser = new DocxParser();
@@ -48,7 +49,7 @@ var options = new ExtractionOptions
     IncludeMetadata = false,
     IncludeFootnotes = false
 };
-var text = docxParser.ExtractText(bytes, options);
+var text = docxParser.ExtractText(File.ReadAllBytes("report.docx"), options);
 ```
 
 ## Output Format
@@ -93,27 +94,30 @@ Use `ExtractionOptions` to selectively disable metadata, footnotes, comments, or
 | Excel | `.xlsx` | `XlsxParser` | OpenXML spreadsheets |
 | PowerPoint | `.pptx` | `PptxParser` | OpenXML presentations |
 | HTML | `.html`, `.htm` | `HtmlParser` | SmartReader + ReverseMarkdown |
+| PDF | `.pdf` | `PdfParser` | PdfPig (pure managed, text only) |
 
-## PDF Support
+## Optional PDF Extensions
 
-PDF requires native libraries (PDFium). Install the separate package:
+PDF text extraction is built in. Two sibling packages add extra PDF capabilities
+that require native binaries:
 
-```bash
-dotnet add package FieldCure.DocumentParsers.Pdf
-```
+- **Page image rendering** — [FieldCure.DocumentParsers.Imaging](https://www.nuget.org/packages/FieldCure.DocumentParsers.Imaging) adds `PdfImageRenderer : IMediaDocumentParser` (PDFium via PDFtoImage).
+- **OCR fallback for scanned PDFs** — [FieldCure.DocumentParsers.Ocr](https://www.nuget.org/packages/FieldCure.DocumentParsers.Ocr) adds `OcrPdfParser` + `TesseractOcrEngine` (English + Korean tessdata).
 
 ```csharp
-using FieldCure.DocumentParsers.Pdf;
+// Imaging (page → PNG)
+using FieldCure.DocumentParsers.Imaging;
+DocumentParserFactoryImagingExtensions.AddImagingSupport();
 
-// Register PDF support (call once at startup)
-DocumentParserFactoryExtensions.AddPdfSupport();
+// OCR (scanned PDFs)
+using FieldCure.DocumentParsers.Ocr;
+using var ocr = DocumentParserFactoryOcrExtensions.AddOcrSupport();
 ```
-
-See [FieldCure.DocumentParsers.Pdf](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf) for details.
 
 ## Related Packages
 
-- [FieldCure.DocumentParsers.Pdf](https://www.nuget.org/packages/FieldCure.DocumentParsers.Pdf) — PDF text extraction and page rendering
+- [FieldCure.DocumentParsers.Imaging](https://www.nuget.org/packages/FieldCure.DocumentParsers.Imaging) — PDF page image rendering (PDFium)
+- [FieldCure.DocumentParsers.Ocr](https://www.nuget.org/packages/FieldCure.DocumentParsers.Ocr) — Tesseract OCR fallback for scanned PDFs
 - [FieldCure.AssistStudio.Core](https://www.nuget.org/packages/FieldCure.AssistStudio.Core) — AI provider client library that uses this package for document attachments
 
 ## License

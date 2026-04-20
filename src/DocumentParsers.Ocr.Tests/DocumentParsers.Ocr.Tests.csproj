@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>FieldCure.DocumentParsers.Pdf.Tests</RootNamespace>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>FieldCure.DocumentParsers.Ocr.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <Nullable>enable</Nullable>
@@ -17,13 +17,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DocumentParsers.Pdf\DocumentParsers.Pdf.csproj" />
+    <ProjectReference Include="..\DocumentParsers.Ocr\DocumentParsers.Ocr.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="TestData\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <!-- Tests exercise the Windows-only OCR engine, so the test assembly itself
+       is Windows-only. Declaring it here silences the CA1416 flood from the
+       [SupportedOSPlatform("windows")] attribute on DocumentParsers.Ocr. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatform">
+      <_Parameter1>windows</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
 </Project>

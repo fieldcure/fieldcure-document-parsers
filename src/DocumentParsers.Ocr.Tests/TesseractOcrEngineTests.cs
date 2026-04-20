@@ -1,4 +1,6 @@
-namespace FieldCure.DocumentParsers.Pdf.Ocr.Tests;
+using FieldCure.DocumentParsers.Imaging;
+
+namespace FieldCure.DocumentParsers.Ocr.Tests;
 
 [TestClass]
 public class TesseractOcrEngineTests
@@ -11,7 +13,7 @@ public class TesseractOcrEngineTests
 
     private static byte[] RenderFirstPage(string filename, int dpi = 300)
     {
-        var images = new PdfParser().ExtractImages(ReadBytes(filename), dpi);
+        var images = new PdfImageRenderer().ExtractImages(ReadBytes(filename), dpi);
         return images[0].Data;
     }
 

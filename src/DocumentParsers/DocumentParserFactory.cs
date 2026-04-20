@@ -5,8 +5,9 @@ namespace FieldCure.DocumentParsers;
 /// <summary>
 /// Resolves the appropriate <see cref="IDocumentParser"/> for a given file extension.
 /// Thread-safe registry of all available parsers.
-/// Built-in parsers (DOCX, HWPX, XLSX, PPTX) are registered automatically.
-/// External parsers (e.g., PDF) can be added via <see cref="Register"/>.
+/// Built-in parsers (DOCX, HWPX, XLSX, PPTX, HTML, PDF) are registered automatically.
+/// External parsers (e.g., <c>PdfImageRenderer</c> from DocumentParsers.Imaging,
+/// <c>OcrPdfParser</c> from DocumentParsers.Ocr) can be added via <see cref="Register"/>.
 /// </summary>
 public static class DocumentParserFactory
 {
@@ -21,6 +22,7 @@ public static class DocumentParserFactory
             new XlsxParser(),
             new PptxParser(),
             new HtmlParser(),
+            new PdfParser(),
         };
 
         foreach (var p in builtIn)

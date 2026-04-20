@@ -5,19 +5,19 @@
 | Script | Packages |
 |--------|----------|
 | `publish-core.ps1` | `FieldCure.DocumentParsers` only |
-| `publish-pdf.ps1` | `FieldCure.DocumentParsers.Pdf` only |
-| `publish-nuget.ps1` | Both (Core + Pdf) |
+| `publish-imaging.ps1` | `FieldCure.DocumentParsers.Imaging` only |
+| `publish-ocr.ps1` | `FieldCure.DocumentParsers.Ocr` only |
+| `publish-nuget.ps1` | All three (Core + Imaging + Ocr) |
 
 ```powershell
-# Core only
+# Single package
 .\scripts\publish-core.ps1                      # pack → sign → push
-.\scripts\publish-core.ps1 -SkipPush            # pack → sign only
+.\scripts\publish-imaging.ps1                   # pack → sign → push
+.\scripts\publish-ocr.ps1                       # pack → sign → push
 
-# Pdf only
-.\scripts\publish-pdf.ps1                       # pack → sign → push
-
-# Both at once
+# All at once
 .\scripts\publish-nuget.ps1                     # pack → sign → push
+.\scripts\publish-nuget.ps1 -SkipPush           # pack → sign only
 .\scripts\publish-nuget.ps1 -SkipSign -SkipPush # pack only (testing)
 ```
 

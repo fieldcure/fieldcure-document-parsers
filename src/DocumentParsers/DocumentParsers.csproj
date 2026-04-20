@@ -1,28 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>1.1.0</Version>
+    <Version>2.0.0</Version>
     <AssemblyName>FieldCure.DocumentParsers</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <!-- NuGet Package Metadata -->
     <PackageId>FieldCure.DocumentParsers</PackageId>
-    <Description>Document text extraction for DOCX, HWPX, XLSX, PPTX, and HTML. RAG-ready structured Markdown output with heading detection, tables, metadata (YAML front matter), footnotes, endnotes, comments, and headers/footers.</Description>
+    <Description>Document text extraction for DOCX, HWPX, XLSX, PPTX, HTML, and PDF. RAG-ready structured Markdown output with heading detection, tables, metadata (YAML front matter), footnotes, endnotes, comments, and headers/footers. Pure managed (no native binaries) — PDF text extraction via PdfPig.</Description>
     <Authors>Jong Hyun Kim</Authors>
     <Company>Fieldcure Co., Ltd.</Company>
     <Copyright>Copyright (c) 2026 Fieldcure Co., Ltd.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/fieldcure/fieldcure-document-parsers</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>document;parser;docx;hwpx;xlsx;pptx;html;htm;text-extraction;rag;metadata;footnotes</PackageTags>
+    <PackageTags>document;parser;docx;hwpx;xlsx;pptx;html;htm;pdf;text-extraction;rag;metadata;footnotes</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\..\..\RELEASENOTES.DocumentParsers.md'))</PackageReleaseNotes>
+    <PackageReleaseNotes>
+      v2.0.0 — Breaking: PDF text extraction promoted to core (PdfPig). `PdfParser` auto-registers in DocumentParserFactory; `AddPdfSupport()` removed. Page image rendering moved to FieldCure.DocumentParsers.Imaging; OCR fallback moved to FieldCure.DocumentParsers.Ocr (renamed from .Pdf.Ocr). Namespace FieldCure.DocumentParsers.Pdf.PdfParser → FieldCure.DocumentParsers.PdfParser.
+    </PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,6 +40,7 @@
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.*" />
     <PackageReference Include="SmartReader" Version="*" />
     <PackageReference Include="ReverseMarkdown" Version="*" />
+    <PackageReference Include="PdfPig" Version="0.1.*" />
   </ItemGroup>
 
 </Project>

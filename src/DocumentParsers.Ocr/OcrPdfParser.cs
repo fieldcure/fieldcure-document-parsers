@@ -1,23 +1,23 @@
 using System.Text;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
-namespace FieldCure.DocumentParsers.Pdf;
+namespace FieldCure.DocumentParsers.Ocr;
 
 /// <summary>
-/// Extracts text and page images from PDF files.
-/// Text extraction via PdfPig, page rendering via PDFtoImage (PDFium).
-/// When an <see cref="IOcrEngine"/> is provided, pages with no extractable text
-/// are automatically processed via OCR as a fallback.
+/// PDF parser that falls back to OCR for pages with no extractable text layer.
+/// Text extraction uses PdfPig; when a page yields no meaningful content,
+/// the page is rendered at <see cref="OcrRenderDpi"/> via PDFium and sent to the
+/// injected <see cref="IOcrEngine"/>.
 /// </summary>
-public sealed class PdfParser : IMediaDocumentParser
+public sealed class OcrPdfParser : IDocumentParser
 {
     #region Fields
 
-    private readonly IOcrEngine? _ocrEngine;
+    private readonly IOcrEngine _ocrEngine;
 
     /// <summary>
-    /// Minimum number of non-whitespace characters for a page to be considered
-    /// as having meaningful text content.
+    /// Minimum non-whitespace character count for a page to be considered as
+    /// having meaningful text content.
     /// </summary>
     private const int MinMeaningfulCharCount = 10;
 
@@ -34,18 +34,13 @@ public sealed class PdfParser : IMediaDocumentParser
 
     #endregion
 
-    #region Constructors
+    #region Constructor
 
     /// <summary>
-    /// Creates a parser with text extraction only (no OCR fallback).
+    /// Creates an OCR-augmented PDF parser.
     /// </summary>
-    public PdfParser() { }
-
-    /// <summary>
-    /// Creates a parser with OCR fallback for scanned pages.
-    /// </summary>
-    /// <param name="ocrEngine">OCR engine to use when text extraction yields no content.</param>
-    public PdfParser(IOcrEngine ocrEngine)
+    /// <param name="ocrEngine">OCR engine to use when PdfPig yields no content for a page.</param>
+    public OcrPdfParser(IOcrEngine ocrEngine)
     {
         ArgumentNullException.ThrowIfNull(ocrEngine);
         _ocrEngine = ocrEngine;
@@ -53,17 +48,12 @@ public sealed class PdfParser : IMediaDocumentParser
 
     #endregion
 
-    #region IMediaDocumentParser
+    #region IDocumentParser
 
     /// <inheritdoc />
     public IReadOnlyList<string> SupportedExtensions => [".pdf"];
 
-    /// <summary>
-    /// Extracts text from all pages using PdfPig.
-    /// Pages are separated by page headers ("## Page {n}").
-    /// When an OCR engine is configured, pages with no extractable text
-    /// are rendered at 300 DPI and processed via OCR.
-    /// </summary>
+    /// <inheritdoc />
     public string ExtractText(byte[] data)
     {
         using var document = UglyToad.PdfPig.PdfDocument.Open(data);
@@ -79,7 +69,7 @@ public sealed class PdfParser : IMediaDocumentParser
 
             var text = ContentOrderTextExtractor.GetText(page);
 
-            if (_ocrEngine is not null && IsMostlyEmpty(text))
+            if (IsMostlyEmpty(text))
             {
                 text = OcrPage(data, pageNumber - 1);
             }
@@ -88,28 +78,6 @@ public sealed class PdfParser : IMediaDocumentParser
         }
 
         return sb.ToString().TrimEnd();
-    }
-
-    /// <summary>
-    /// Renders each PDF page as a PNG image.
-    /// </summary>
-    /// <param name="data">Raw PDF bytes.</param>
-    /// <param name="dpi">Render resolution. 150 balances quality vs size.</param>
-    /// <returns>One PNG per page with "Page {n}" labels.</returns>
-    public IReadOnlyList<DocumentImage> ExtractImages(byte[] data, int dpi = 150)
-    {
-        var images = new List<DocumentImage>();
-        var pageCount = PDFtoImage.Conversion.GetPageCount(data);
-        var options = new PDFtoImage.RenderOptions(Dpi: dpi);
-
-        for (var i = 0; i < pageCount; i++)
-        {
-            using var ms = new MemoryStream();
-            PDFtoImage.Conversion.SavePng(ms, data, i, options: options);
-            images.Add(new DocumentImage(ms.ToArray(), $"Page {i + 1}", i));
-        }
-
-        return images;
     }
 
     #endregion
@@ -141,7 +109,7 @@ public sealed class PdfParser : IMediaDocumentParser
         using var ms = new MemoryStream();
         var options = new PDFtoImage.RenderOptions(Dpi: OcrRenderDpi);
         PDFtoImage.Conversion.SavePng(ms, data, pageIndex, options: options);
-        return _ocrEngine!.RecognizeAsync(ms.ToArray()).GetAwaiter().GetResult();
+        return _ocrEngine.RecognizeAsync(ms.ToArray()).GetAwaiter().GetResult();
     }
 
     #endregion

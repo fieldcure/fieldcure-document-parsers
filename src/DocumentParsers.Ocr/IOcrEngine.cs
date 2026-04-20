@@ -1,4 +1,4 @@
-namespace FieldCure.DocumentParsers.Pdf;
+namespace FieldCure.DocumentParsers.Ocr;
 
 /// <summary>
 /// Abstraction for OCR engines used as fallback when PDF text extraction yields no content.

@@ -24,9 +24,10 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Environment**
-- Package version: (e.g., 0.2.0)
-- Parser: (DocxParser / HwpxParser / XlsxParser / PptxParser / PdfParser)
+- Package(s) and version: (e.g., FieldCure.DocumentParsers 2.0.0, FieldCure.DocumentParsers.Imaging 1.0.0, FieldCure.DocumentParsers.Ocr 1.0.0)
+- Parser: (DocxParser / HwpxParser / XlsxParser / PptxParser / HtmlParser / PdfParser / PdfImageRenderer / OcrPdfParser)
 - .NET version: (e.g., net8.0)
+- OS: (Windows / Linux / macOS)
 
 **Additional context**
 Add any other context about the problem here.

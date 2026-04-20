@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Tesseract;
 
-namespace FieldCure.DocumentParsers.Pdf.Ocr;
+namespace FieldCure.DocumentParsers.Ocr;
 
 /// <summary>
 /// Tesseract-based OCR engine with automatic language discovery and engine pooling.
@@ -120,7 +120,7 @@ public sealed partial class TesseractOcrEngine : IOcrEngine, IDisposable
         foreach (var name in assembly.GetManifestResourceNames()
             .Where(n => n.EndsWith(".traineddata", StringComparison.OrdinalIgnoreCase)))
         {
-            // Resource name format: FieldCure.DocumentParsers.Pdf.Ocr.tessdata.eng.traineddata
+            // Resource name format: FieldCure.DocumentParsers.Ocr.tessdata.eng.traineddata
             // Extract language name: second-to-last segment before ".traineddata"
             var segments = name.Split('.');
             var langIndex = segments.Length - 2; // "eng" or "kor" is right before "traineddata"

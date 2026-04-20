@@ -1,0 +1,112 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <Version>1.0.0</Version>
+    <AssemblyName>FieldCure.DocumentParsers.Ocr</AssemblyName>
+    <RootNamespace>FieldCure.DocumentParsers.Ocr</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>FieldCure.DocumentParsers.Ocr</PackageId>
+    <Description>
+      Tesseract OCR fallback for scanned PDFs on Windows. Plugs into
+      FieldCure.DocumentParsers as an IDocumentParser for .pdf that renders pages
+      with PDFium and recognizes text with Tesseract when PdfPig yields no content.
+    </Description>
+    <Authors>Jong Hyun Kim</Authors>
+    <Company>Fieldcure Co., Ltd.</Company>
+    <Copyright>Copyright (c) 2026 Fieldcure Co., Ltd.</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/fieldcure/fieldcure-document-parsers</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>document;parser;pdf;ocr;tesseract;text-extraction;rag;windows</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>
+      v1.0.0 — Initial release. Successor to the deprecated FieldCure.DocumentParsers.Pdf.Ocr. Provides `OcrPdfParser` (replaces the old `PdfParser(IOcrEngine)` overload), `TesseractOcrEngine` with English + Korean tessdata, and `DocumentParserFactoryOcrExtensions.AddOcrSupport()` / `AddOcrSupport(IOcrEngine)`. Namespace: `FieldCure.DocumentParsers.Ocr`. Depends on FieldCure.DocumentParsers.Imaging for page rendering. Windows only — assembly is marked `[SupportedOSPlatform("windows")]`. Linux / macOS support is planned for a future release.
+    </PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\DocumentParsers\icon.png" Pack="true" PackagePath="" Link="icon.png" />
+  </ItemGroup>
+
+  <!-- Signal Windows-only at the assembly level. Roslyn's platform-compat analyzer
+       (CA1416) will warn cross-platform consumers at compile time, which is exactly
+       what we want — better a compile-time nudge than a runtime DllNotFoundException.
+       Consumers who knowingly restrict deployment to Windows can suppress with
+       #pragma warning disable CA1416. Remove this once Tesseract native binaries
+       ship for linux-x64 / osx-x64. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatform">
+      <_Parameter1>windows</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="tessdata\*.traineddata" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DocumentParsers.Imaging\DocumentParsers.Imaging.csproj" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+  </ItemGroup>
+
+  <!--
+    ============================================================================
+    Native DLL packaging strategy — why "x64/" + build/*.targets, not runtimes/
+    ============================================================================
+    This package ships Tesseract's native DLLs at "x64/" (package root) and
+    copies them to the consumer's output via build/*.targets. We intentionally
+    do NOT use the modern "runtimes/win-x64/native/" NuGet convention.
+
+    Rationale:
+      - Normal library consumers already get these DLLs transitively from the
+        Tesseract package itself — so this redistribution is redundant for them
+        (harmless, NuGet overwrites with identical bytes).
+      - PackAsTool consumers (MCP servers, dotnet global tools) are the real
+        target. PackAsTool does NOT propagate native transitive dependencies,
+        and it ignores runtimes/<rid>/native/. Tool packages require the
+        "tools/<tfm>/<arch>/" layout, which our build/*.targets emits via a
+        Condition="'$(PackAsTool)' == 'true'" item group.
+      - Switching to runtimes/win-x64/native/ would re-introduce the
+        DllNotFoundException that v1.0.1 of the predecessor package
+        (FieldCure.DocumentParsers.Pdf.Ocr) was released to fix.
+      - NU5100 warnings from pack ("x64\*.dll is outside lib/") are expected
+        and suppressed by convention — the DLLs are deliberately not managed
+        references.
+
+    Future cross-platform OCR:
+      Add runtimes/linux-x64/native/ and runtimes/osx-x64/native/ ALONGSIDE
+      (not replacing) the current x64/ + targets structure. The two layouts
+      coexist: normal consumers resolve via runtimes/, PackAsTool consumers
+      still need the .targets-driven tools/<tfm>/<arch>/ copy.
+
+    Maintenance:
+      When upgrading Tesseract, update the version and filenames BOTH here AND
+      in build/*.targets (e.g., tesseract50.dll -> tesseract53.dll; leptonica
+      version may also change). Paths resolve via $(NuGetPackageRoot) because
+      GeneratePathProperty="true" is unreliable in multi-TFM pack scenarios
+      (the $(PkgTesseract) property evaluates empty during pack aggregation).
+    ============================================================================
+  -->
+  <ItemGroup>
+    <None Include="$(NuGetPackageRoot)tesseract\5.2.0\x64\leptonica-1.82.0.dll"
+          Pack="true" PackagePath="x64/" Visible="false" />
+    <None Include="$(NuGetPackageRoot)tesseract\5.2.0\x64\tesseract50.dll"
+          Pack="true" PackagePath="x64/" Visible="false" />
+
+    <!-- .targets for both direct and transitive consumers -->
+    <None Include="build\FieldCure.DocumentParsers.Ocr.targets"
+          Pack="true" PackagePath="build/" />
+    <None Include="build\FieldCure.DocumentParsers.Ocr.targets"
+          Pack="true" PackagePath="buildTransitive/" />
+  </ItemGroup>
+
+</Project>

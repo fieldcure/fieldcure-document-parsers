@@ -13,7 +13,8 @@ dotnet test
 
 # Run a single test project
 dotnet test src/DocumentParsers.Tests
-dotnet test src/DocumentParsers.Pdf.Tests
+dotnet test src/DocumentParsers.Imaging.Tests
+dotnet test src/DocumentParsers.Ocr.Tests
 
 # Run a single test by name
 dotnet test --filter "FullyQualifiedName~DocxParserTests.ExtractText_SimpleText"
@@ -22,28 +23,35 @@ dotnet test --filter "FullyQualifiedName~DocxParserTests.ExtractText_SimpleText"
 dotnet pack -c Release -o artifacts
 ```
 
-Requires .NET 8.0 SDK (global.json pins SDK 9.0.308; both 8.0 and 9.0 are used in CI).
+Requires .NET 10.0 SDK (global.json pins `10.0.201` with `rollForward: latestFeature`). All library projects multi-target `net8.0;net10.0`; CI installs 8.0.x and 10.0.x.
 
 ## Architecture
 
 **Purpose:** Lightweight document-to-text extraction library for .NET, designed for LLM/RAG pipelines. Outputs markdown tables and LaTeX math notation for LLM comprehension.
 
-**Two NuGet packages:**
-- `FieldCure.DocumentParsers` — Core library for DOCX, HWPX, XLSX, PPTX (depends on OpenXML SDK)
-- `FieldCure.DocumentParsers.Pdf` — PDF extension (depends on PdfPig + PDFtoImage); separated to avoid native binary dependencies
+**Three NuGet packages (v2.0):**
+- `FieldCure.DocumentParsers` — Core library for DOCX, HWPX, XLSX, PPTX, HTML, **PDF (text)** via OpenXML SDK + PdfPig. Pure managed, no native binaries.
+- `FieldCure.DocumentParsers.Imaging` — Adds PDF page image rendering via PDFtoImage (PDFium native).
+- `FieldCure.DocumentParsers.Ocr` — Tesseract OCR fallback for scanned PDFs (renamed from `.Pdf.Ocr`). Depends on Imaging.
+
+Dependency direction: `Ocr → Imaging → Core`. The deprecated v1 packages `FieldCure.DocumentParsers.Pdf` and `FieldCure.DocumentParsers.Pdf.Ocr` are replaced by this topology.
 
 **Key abstractions:**
 - `IDocumentParser` — Base interface: `SupportedExtensions` + `ExtractText(byte[] data)`
 - `IMediaDocumentParser : IDocumentParser` — Adds `ExtractImages(byte[] data, int dpi)` for formats with embedded images
-- `DocumentParserFactory` — Thread-safe static factory with `ConcurrentDictionary`. Auto-registers built-in parsers; supports dynamic registration via `Register()`. Lookup is case-insensitive by extension.
-- `DocumentParserFactoryExtensions.AddPdfSupport()` — Registers PdfParser into the factory
+- `DocumentParserFactory` — Thread-safe static factory with `ConcurrentDictionary`. Auto-registers all built-in parsers **including `PdfParser`**; supports dynamic registration via `Register()`. Lookup is case-insensitive by extension.
+- `DocumentParserFactoryImagingExtensions.AddImagingSupport()` — Registers `PdfImageRenderer`, upgrading `.pdf` to `IMediaDocumentParser`.
+- `DocumentParserFactoryOcrExtensions.AddOcrSupport(IOcrEngine?)` — Registers `OcrPdfParser` for scanned-PDF fallback.
 
 **Parser implementations:**
 - `Ooxml/DocxParser` — DOCX via OpenXML SDK (paragraphs, nested tables, math → LaTeX)
 - `Ooxml/XlsxParser` — XLSX via OpenXML SDK (sheets as markdown tables, SharedString resolution)
 - `Ooxml/PptxParser` — PPTX via OpenXML SDK (slides, text frames, tables, speaker notes with `[Notes]` prefix)
 - `Hwpx/HwpxParser` — HWPX (Korean OWPML) via ZipArchive + XLinq (paragraphs, tables, equations)
-- `PdfParser` — PDF via PdfPig (text) + PDFtoImage (page rendering as PNG)
+- `Html/HtmlParser` — HTML via SmartReader + ReverseMarkdown
+- `Pdf/PdfParser` — PDF text via PdfPig (core, pure managed)
+- `PdfImageRenderer` (Imaging) — PDF pages → PNG via PDFtoImage; `ExtractText` delegates to core `PdfParser` (additive)
+- `OcrPdfParser` (Ocr) — PdfPig + Tesseract fallback when a page has no text layer
 
 **Math equation conversion (internal):**
 - `OoxmlMathConverter` — Converts OOXML `m:oMath` elements to LaTeX, output wrapped in `[math: ...]`
