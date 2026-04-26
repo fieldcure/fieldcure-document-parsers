@@ -8,12 +8,14 @@
     <File Path="RELEASENOTES.DocumentParsers.md" />
     <File Path="RELEASENOTES.DocumentParsers.Imaging.md" />
     <File Path="RELEASENOTES.DocumentParsers.Ocr.md" />
+    <File Path="RELEASENOTES.DocumentParsers.Audio.md" />
   </Folder>
 
   <Folder Name="/src/">
     <Project Path="src/DocumentParsers/DocumentParsers.csproj" />
     <Project Path="src/DocumentParsers.Imaging/DocumentParsers.Imaging.csproj" />
     <Project Path="src/DocumentParsers.Ocr/DocumentParsers.Ocr.csproj" />
+    <Project Path="src/DocumentParsers.Audio/DocumentParsers.Audio.csproj" />
     <Project Path="src/DocumentParsers.Cli/DocumentParsers.Cli.csproj" />
   </Folder>
 
@@ -21,6 +23,7 @@
     <Project Path="src/DocumentParsers.Tests/DocumentParsers.Tests.csproj" />
     <Project Path="src/DocumentParsers.Imaging.Tests/DocumentParsers.Imaging.Tests.csproj" />
     <Project Path="src/DocumentParsers.Ocr.Tests/DocumentParsers.Ocr.Tests.csproj" />
+    <Project Path="src/DocumentParsers.Audio.Tests/DocumentParsers.Audio.Tests.csproj" />
   </Folder>
 
 </Solution>

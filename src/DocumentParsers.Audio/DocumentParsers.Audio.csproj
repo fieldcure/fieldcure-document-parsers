@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <Version>0.1.0</Version>
+    <AssemblyName>FieldCure.DocumentParsers.Audio</AssemblyName>
+    <RootNamespace>FieldCure.DocumentParsers.Audio</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <PackageId>FieldCure.DocumentParsers.Audio</PackageId>
+    <Description>Audio transcription parser for FieldCure.DocumentParsers. Converts MP3, WAV, M4A, OGG, FLAC, and WebM audio into timestamped Markdown transcripts via Whisper.net.</Description>
+    <Authors>Jong Hyun Kim</Authors>
+    <Company>Fieldcure Co., Ltd.</Company>
+    <Copyright>Copyright (c) 2026 Fieldcure Co., Ltd.</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/fieldcure/fieldcure-document-parsers</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>document;parser;audio;transcription;whisper;speech-to-text;rag;windows</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>
+      v0.1.0 - Initial audio parser package. Adds AudioDocumentParser, IAudioTranscriber, WhisperTranscriber, local ggml model caching, NAudio conversion to 16 kHz mono WAV, and DocumentParserFactoryAudioExtensions.AddAudioSupport().
+    </PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\DocumentParsers\icon.png" Pack="true" PackagePath="" Link="icon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatform">
+      <_Parameter1>windows</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DocumentParsers\DocumentParsers.csproj" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
+    <PackageReference Include="Whisper.net" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" />
+  </ItemGroup>
+
+</Project>
