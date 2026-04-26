@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
     <AssemblyName>FieldCure.DocumentParsers</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -23,7 +23,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v2.0.0 — Breaking: PDF text extraction promoted to core (PdfPig). `PdfParser` auto-registers in DocumentParserFactory; `AddPdfSupport()` removed. Page image rendering moved to FieldCure.DocumentParsers.Imaging; OCR fallback moved to FieldCure.DocumentParsers.Ocr (renamed from .Pdf.Ocr). Namespace FieldCure.DocumentParsers.Pdf.PdfParser → FieldCure.DocumentParsers.PdfParser.
+      v2.0.1 — `ExtractionOptions` is no longer sealed so downstream parser packages (e.g. FieldCure.DocumentParsers.Audio) can subclass it. Adds `ExtractionOptions.SourceExtension` so callers can hint the source format and let parsers skip probing.
     </PackageReleaseNotes>
   </PropertyGroup>
 

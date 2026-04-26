@@ -1,6 +1,6 @@
 # Release Notes — FieldCure.DocumentParsers
 
-## [Unreleased]
+## [2.0.1] - 2026-04-26
 
 ### Changed
 - `ExtractionOptions` is no longer `sealed`. Downstream parser packages (e.g. `FieldCure.DocumentParsers.Audio`) subclass it to add format-specific options. Source- and binary-compatible for existing callers.

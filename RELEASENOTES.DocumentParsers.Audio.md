@@ -1,6 +1,6 @@
 # FieldCure.DocumentParsers.Audio Release Notes
 
-## v0.1.0
+## v0.1.0 - 2026-04-26
 
 - Added `AudioDocumentParser` for `.mp3`, `.wav`, `.m4a`, `.ogg`, `.flac`, and `.webm`.
 - Added `IAudioTranscriber` plus a default Whisper.net-backed `WhisperTranscriber`.
