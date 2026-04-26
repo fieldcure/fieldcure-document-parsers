@@ -33,6 +33,9 @@ jobs:
               Ocr|DocumentParsers.Ocr|FieldCure.DocumentParsers.Ocr)
                 echo "DocumentParsers.Ocr|FieldCure.DocumentParsers.Ocr|RELEASENOTES.DocumentParsers.Ocr.md"
                 ;;
+              Audio|DocumentParsers.Audio|FieldCure.DocumentParsers.Audio)
+                echo "DocumentParsers.Audio|FieldCure.DocumentParsers.Audio|RELEASENOTES.DocumentParsers.Audio.md"
+                ;;
               *)
                 return 1
                 ;;
@@ -59,6 +62,12 @@ jobs:
               echo "# DocumentParsers.Ocr"
               echo ""
               cat RELEASENOTES.DocumentParsers.Ocr.md
+              echo ""
+              echo "---"
+              echo ""
+              echo "# DocumentParsers.Audio"
+              echo ""
+              cat RELEASENOTES.DocumentParsers.Audio.md
             } > RELEASE_BODY.md
 
             gh release create "$TAG" \

@@ -18,7 +18,8 @@ Invoke-NuGetPublish `
     -Projects @(
         'src\DocumentParsers\DocumentParsers.csproj',
         'src\DocumentParsers.Imaging\DocumentParsers.Imaging.csproj',
-        'src\DocumentParsers.Ocr\DocumentParsers.Ocr.csproj'
+        'src\DocumentParsers.Ocr\DocumentParsers.Ocr.csproj',
+        'src\DocumentParsers.Audio\DocumentParsers.Audio.csproj'
     ) `
     -SkipSign:$SkipSign `
     -SkipPush:$SkipPush `

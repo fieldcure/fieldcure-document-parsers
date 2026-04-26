@@ -7,13 +7,15 @@
 | `publish-core.ps1` | `FieldCure.DocumentParsers` only |
 | `publish-imaging.ps1` | `FieldCure.DocumentParsers.Imaging` only |
 | `publish-ocr.ps1` | `FieldCure.DocumentParsers.Ocr` only |
-| `publish-nuget.ps1` | All three (Core + Imaging + Ocr) |
+| `publish-audio.ps1` | `FieldCure.DocumentParsers.Audio` only |
+| `publish-nuget.ps1` | All packages (Core + Imaging + Ocr + Audio) |
 
 ```powershell
 # Single package
 .\scripts\publish-core.ps1                      # pack → sign → push
 .\scripts\publish-imaging.ps1                   # pack → sign → push
 .\scripts\publish-ocr.ps1                       # pack → sign → push
+.\scripts\publish-audio.ps1                     # pack → sign → push
 
 # All at once
 .\scripts\publish-nuget.ps1                     # pack → sign → push

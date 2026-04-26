@@ -3,6 +3,7 @@
 [![Core](https://img.shields.io/nuget/v/FieldCure.DocumentParsers?label=Core)](https://www.nuget.org/packages/FieldCure.DocumentParsers)
 [![Imaging](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Imaging?label=Imaging)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Imaging)
 [![Ocr](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Ocr?label=Ocr)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Ocr)
+[![Audio](https://img.shields.io/nuget/v/FieldCure.DocumentParsers.Audio?label=Audio)](https://www.nuget.org/packages/FieldCure.DocumentParsers.Audio)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Lightweight document-to-text extraction library for .NET.
@@ -17,6 +18,7 @@ with heading detection and table support — designed for LLM/RAG pipelines.
 - **PPTX** — slide text, speaker notes, slide tables → markdown, grouped shapes, metadata → YAML front matter
 - **HTML** — readable content extraction (SmartReader) → GitHub-flavored Markdown (ReverseMarkdown)
 - **PDF** — text extraction (PdfPig, pure managed). Page image rendering and OCR are separate opt-in packages.
+- **Audio** — MP3/WAV/M4A/OGG/FLAC/WebM → timestamped Markdown transcripts via Whisper.net (separate opt-in package).
 
 ## Packages
 
@@ -25,8 +27,9 @@ with heading detection and table support — designed for LLM/RAG pipelines.
 | `FieldCure.DocumentParsers` | DOCX, HWPX, XLSX, PPTX, HTML, **PDF** (text) | — |
 | `FieldCure.DocumentParsers.Imaging` | PDF → page images (adds `IMediaDocumentParser`) | PDFium |
 | `FieldCure.DocumentParsers.Ocr` | Tesseract OCR fallback for scanned PDFs — **Windows only** | PDFium + Tesseract |
+| `FieldCure.DocumentParsers.Audio` | Audio → timestamped transcripts via Whisper.net — **Windows only** | Whisper.net + NAudio |
 
-The core package is pure managed — no native binaries are pulled in unless you opt into Imaging or Ocr.
+The core package is pure managed — no native binaries are pulled in unless you opt into Imaging, Ocr, or Audio.
 
 > The Ocr package is currently **Windows only** — the bundled Tesseract 5.2.0 ships native Windows binaries only. The assembly carries `[SupportedOSPlatform("windows")]`, so non-Windows consumers will see CA1416 warnings at compile time. Cross-platform OCR is on the roadmap; in the meantime use the core package directly for PDFs that have an embedded text layer (works everywhere).
 
@@ -43,6 +46,9 @@ dotnet add package FieldCure.DocumentParsers.Imaging
 
 # OCR fallback for scanned PDFs (optional, pulls Tesseract + PDFium)
 dotnet add package FieldCure.DocumentParsers.Ocr
+
+# Audio transcription (optional, pulls Whisper.net runtimes + NAudio)
+dotnet add package FieldCure.DocumentParsers.Audio
 ```
 
 ## Quick Start
@@ -91,6 +97,17 @@ using var ocr = DocumentParserFactoryOcrExtensions.AddOcrSupport();
 // Scanned pages are OCR'd; pages with an embedded text layer go through PdfPig.
 var parser = DocumentParserFactory.GetParser(".pdf")!;
 var text = parser.ExtractText(File.ReadAllBytes("scanned.pdf"));
+```
+
+```csharp
+using FieldCure.DocumentParsers;
+using FieldCure.DocumentParsers.Audio;
+
+// Register audio support. Dispose the transcriber at shutdown.
+await using var transcriber = DocumentParserFactoryAudioExtensions.AddAudioSupport();
+
+var parser = DocumentParserFactory.GetParser(".mp3")!;
+var transcript = parser.ExtractText(File.ReadAllBytes("meeting.mp3"));
 ```
 
 ## Custom Parser
@@ -202,6 +219,15 @@ Pipe characters inside cells are escaped as `\|` to preserve table structure.
 | Multi-page documents, Unicode text | |
 | English + Korean OCR (tessdata_fast) — `Ocr` | |
 
+### Audio
+
+| Supported | Not Yet Supported |
+|-----------|-------------------|
+| MP3, WAV, M4A, OGG, FLAC, WebM — `Audio` package | Real-time microphone input |
+| Timestamped Markdown transcript | Speaker diarization |
+| Whisper ggml model cache | Video audio track extraction |
+| Custom `IAudioTranscriber` injection | Word-level timestamps |
+
 ## Repository Structure
 
 All library projects multi-target `net8.0;net10.0`.
@@ -215,10 +241,12 @@ src/
 │   └── Pdf/                             PdfParser (text via PdfPig)
 ├── DocumentParsers.Imaging/             FieldCure.DocumentParsers.Imaging 1.0 (net8.0 + net10.0)
 ├── DocumentParsers.Ocr/                 FieldCure.DocumentParsers.Ocr 1.0 (net8.0 + net10.0)
+├── DocumentParsers.Audio/               FieldCure.DocumentParsers.Audio 0.1 (net8.0 + net10.0)
 ├── DocumentParsers.Cli/                 Console tool for manual output inspection
 ├── DocumentParsers.Tests/               MSTest — core + PdfParser tests
 ├── DocumentParsers.Imaging.Tests/       MSTest — PdfImageRenderer tests
-└── DocumentParsers.Ocr.Tests/           MSTest — OcrPdfParser + TesseractOcrEngine tests
+├── DocumentParsers.Ocr.Tests/           MSTest — OcrPdfParser + TesseractOcrEngine tests
+└── DocumentParsers.Audio.Tests/         MSTest — Audio parser tests
 ```
 
 ## Build & Test
@@ -237,6 +265,7 @@ Part of the [AssistStudio ecosystem](https://github.com/fieldcure/fieldcure-assi
 - [FieldCure.DocumentParsers](RELEASENOTES.DocumentParsers.md)
 - [FieldCure.DocumentParsers.Imaging](RELEASENOTES.DocumentParsers.Imaging.md)
 - [FieldCure.DocumentParsers.Ocr](RELEASENOTES.DocumentParsers.Ocr.md)
+- [FieldCure.DocumentParsers.Audio](RELEASENOTES.DocumentParsers.Audio.md)
 
 ## License
 
