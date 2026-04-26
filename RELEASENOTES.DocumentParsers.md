@@ -1,5 +1,13 @@
 # Release Notes — FieldCure.DocumentParsers
 
+## [Unreleased]
+
+### Changed
+- `ExtractionOptions` is no longer `sealed`. Downstream parser packages (e.g. `FieldCure.DocumentParsers.Audio`) subclass it to add format-specific options. Source- and binary-compatible for existing callers.
+
+### Added
+- `ExtractionOptions.SourceExtension` — optional file extension hint (e.g. `.pdf`, `.mp3`) callers can supply when they already know the source format, letting parsers skip format probing.
+
 ## [2.0.0] - 2026-04-20
 
 ### Breaking Changes

@@ -4,7 +4,7 @@ namespace FieldCure.DocumentParsers;
 /// Options to control which elements are included in the extracted text output.
 /// All options default to <c>true</c> (include everything).
 /// </summary>
-public sealed class ExtractionOptions
+public class ExtractionOptions
 {
     /// <summary>
     /// Include YAML front matter with document metadata (title, author, dates, etc.).
@@ -35,6 +35,13 @@ public sealed class ExtractionOptions
     /// Include comment/memo annotations inline with body text.
     /// </summary>
     public bool IncludeComments { get; init; } = true;
+
+    /// <summary>
+    /// Source file extension, including the leading dot (for example, <c>.pdf</c>).
+    /// The base <see cref="IDocumentParser"/> API does not pass an extension to parsers,
+    /// so callers that already know it can supply it here to skip format probing.
+    /// </summary>
+    public string? SourceExtension { get; init; }
 
     /// <summary>
     /// Default instance with all options enabled.
