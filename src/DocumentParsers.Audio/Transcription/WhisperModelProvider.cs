@@ -102,8 +102,78 @@ public class WhisperModelProvider
         WhisperModelSize.Base => "ggml-base.bin",
         WhisperModelSize.Small => "ggml-small.bin",
         WhisperModelSize.Medium => "ggml-medium.bin",
-        WhisperModelSize.Large => "ggml-large-v3.bin",
+        // Mapped to large-v2 instead of large-v3 due to large-v3's documented
+        // long-form repetition-loop instability. See baseline-2026-04-27.md
+        // for the measurements behind this decision (v0.2.1).
+        WhisperModelSize.Large => "ggml-large-v2.bin",
         _ => "ggml-base.bin"
+    };
+
+    /// <summary>
+    /// Resolves a local model path for an arbitrary <see cref="GgmlType"/>,
+    /// downloading on first use. Exposed for the benchmark tool only — the
+    /// public API stays size-based (<see cref="WhisperModelSize"/>) so
+    /// production callers don't have to track every Whisper variant.
+    /// </summary>
+    /// <param name="ggmlType">Whisper.net ggml model variant.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    internal async Task<string> GetModelPathByGgmlTypeAsync(
+        GgmlType ggmlType,
+        CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(CacheDirectory);
+
+        var modelName = GetGgmlTypeFileName(ggmlType);
+        var modelPath = Path.Combine(CacheDirectory, modelName);
+        if (File.Exists(modelPath) && new FileInfo(modelPath).Length > 0)
+        {
+            return modelPath;
+        }
+
+        var gate = DownloadGates.GetOrAdd(modelPath, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (File.Exists(modelPath) && new FileInfo(modelPath).Length > 0)
+            {
+                return modelPath;
+            }
+
+            var tempPath = modelPath + ".download";
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+
+            using (var modelStream = await WhisperGgmlDownloader.Default
+                .GetGgmlModelAsync(ggmlType)
+                .ConfigureAwait(false))
+            await using (var fileWriter = File.Create(tempPath))
+            {
+                await modelStream.CopyToAsync(fileWriter, cancellationToken).ConfigureAwait(false);
+            }
+
+            File.Move(tempPath, modelPath, overwrite: true);
+            return modelPath;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Cache filename for a specific <see cref="GgmlType"/>. Variant suffixes
+    /// (<c>-v2</c>, <c>-v3-turbo</c>, etc.) keep different Large weights from
+    /// colliding in the cache directory.
+    /// </summary>
+    internal static string GetGgmlTypeFileName(GgmlType type) => type switch
+    {
+        GgmlType.LargeV1 => "ggml-large-v1.bin",
+        GgmlType.LargeV2 => "ggml-large-v2.bin",
+        GgmlType.LargeV3 => "ggml-large-v3.bin",
+        GgmlType.LargeV3Turbo => "ggml-large-v3-turbo.bin",
+        _ => $"ggml-{type.ToString().ToLowerInvariant()}.bin",
     };
 
     /// <summary>
@@ -117,7 +187,9 @@ public class WhisperModelProvider
         WhisperModelSize.Base => GgmlType.Base,
         WhisperModelSize.Small => GgmlType.Small,
         WhisperModelSize.Medium => GgmlType.Medium,
-        WhisperModelSize.Large => GgmlType.LargeV3,
+        // Mapped to LargeV2 instead of LargeV3 due to long-form hallucination
+        // instability; see baseline-2026-04-27.md.
+        WhisperModelSize.Large => GgmlType.LargeV2,
         _ => GgmlType.Base
     };
 

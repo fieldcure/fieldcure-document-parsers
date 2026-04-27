@@ -33,6 +33,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Diagnostic-only internal access for the benchmark tool. Lets the
+         tool reach internal helpers (e.g. GgmlType-based model resolution)
+         without leaking those onto the public API surface. -->
+    <InternalsVisibleTo Include="FieldCure.Tools.AudioBenchmark" />
+    <InternalsVisibleTo Include="FieldCure.DocumentParsers.Audio.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatform">
       <_Parameter1>windows</_Parameter1>
     </AssemblyAttribute>
