@@ -48,4 +48,39 @@ public class AudioExtractionOptions : ExtractionOptions
     /// Default audio extraction options.
     /// </summary>
     public static new AudioExtractionOptions Default { get; } = new();
+
+    /// <summary>
+    /// Returns a copy of these options with the specified model size, leaving
+    /// all other properties unchanged. Provided as a class-friendly substitute
+    /// for the <c>with</c> expression syntax that records support natively.
+    /// </summary>
+    /// <remarks>
+    /// MAINTENANCE: this method explicitly copies every <c>init</c>-only property
+    /// declared on <see cref="AudioExtractionOptions"/> and its base
+    /// <see cref="ExtractionOptions"/>. When a new <c>init</c> property is added
+    /// to either type, it MUST be appended here, otherwise the copy silently
+    /// drops it. The <c>WithModelSize_PreservesAllInitProperties</c> regression
+    /// test enforces this via reflection.
+    /// </remarks>
+    public AudioExtractionOptions WithModelSize(WhisperModelSize modelSize) =>
+        new()
+        {
+            // Base ExtractionOptions properties
+            IncludeMetadata = IncludeMetadata,
+            IncludeHeaders = IncludeHeaders,
+            IncludeFooters = IncludeFooters,
+            IncludeFootnotes = IncludeFootnotes,
+            IncludeEndnotes = IncludeEndnotes,
+            IncludeComments = IncludeComments,
+            SourceExtension = SourceExtension,
+
+            // AudioExtractionOptions own properties
+            Language = Language,
+            ModelSize = modelSize, // overridden
+            ModelPath = ModelPath,
+            TranslateToEnglish = TranslateToEnglish,
+            RuntimeLibraryOrder = RuntimeLibraryOrder,
+            IncludeConfidence = IncludeConfidence,
+            IncludeTimestamps = IncludeTimestamps,
+        };
 }
