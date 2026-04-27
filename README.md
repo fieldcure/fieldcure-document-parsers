@@ -110,6 +110,20 @@ var parser = DocumentParserFactory.GetParser(".mp3")!;
 var transcript = parser.ExtractText(File.ReadAllBytes("meeting.mp3"));
 ```
 
+```csharp
+// Let the library pick a Whisper model size based on detected GPU/RAM/cores.
+// QualityBias.Accuracy (default) shifts up one tier — suitable for batch indexing.
+using FieldCure.DocumentParsers.Audio;
+
+var recommended = WhisperEnvironment.RecommendModelSize(); // e.g. WhisperModelSize.Large
+var options = AudioExtractionOptions.Default.WithModelSize(recommended);
+
+var probe = WhisperEnvironment.Probe();
+Console.Error.WriteLine(
+    $"[Audio] CUDA={probe.CudaAvailable} Vulkan={probe.VulkanAvailable} " +
+    $"RAM={probe.SystemRamBytes / (1024L * 1024 * 1024)}GB → {recommended}");
+```
+
 ## Custom Parser
 
 Implement `IDocumentParser` to add support for any format:
@@ -227,6 +241,23 @@ Pipe characters inside cells are escaped as `\|` to preserve table structure.
 | Timestamped Markdown transcript | Speaker diarization |
 | Whisper ggml model cache | Video audio track extraction |
 | Custom `IAudioTranscriber` injection | Word-level timestamps |
+| Environment-aware model size recommendation | NVML-based VRAM probing (deferred to v0.2) |
+
+#### Model size selection
+
+`WhisperEnvironment.RecommendModelSize(QualityBias)` picks a Whisper model size based on the local environment. CUDA/Vulkan availability is detected via driver-shipped `nvcuda.dll` / `vulkan-1.dll`; physical RAM via `GlobalMemoryStatusEx`; logical cores via `Environment.ProcessorCount`. VRAM is intentionally not probed in v0.1 — RAM ≥ 8 GB on a GPU host is treated as sufficient, and Whisper.net's runtime fallback (CUDA → Vulkan → CPU) handles real-device mismatches.
+
+The balanced matrix (used directly by `QualityBias.Balanced`):
+
+| Environment | Recommended model |
+|---|---|
+| GPU available, RAM ≥ 16 GB | `Large` |
+| GPU available, RAM ≥ 8 GB | `Medium` |
+| CPU only, RAM ≥ 16 GB, cores ≥ 8 | `Small` |
+| CPU only, RAM ≥ 8 GB | `Base` |
+| Otherwise | `Tiny` |
+
+`QualityBias.Accuracy` (default) shifts the recommendation one tier up — appropriate for batch indexing where transcription latency is acceptable. `QualityBias.Speed` shifts one tier down — appropriate for interactive UI flows where the user is actively waiting.
 
 ## Repository Structure
 
