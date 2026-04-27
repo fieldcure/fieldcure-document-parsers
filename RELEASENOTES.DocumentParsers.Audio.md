@@ -1,4 +1,20 @@
-# FieldCure.DocumentParsers.Audio Release Notes
+﻿# FieldCure.DocumentParsers.Audio Release Notes
+
+## v0.2.1 - 2026-04-27
+
+### Changed
+
+- `WhisperModelSize.Large` now resolves to `GgmlType.LargeV2` instead of `GgmlType.LargeV3`. The cache filename moves from `ggml-large-v3.bin` to `ggml-large-v2.bin` accordingly.
+
+### Why
+
+Empirical measurement on three audio classes (Korean studio TTS clips, 16-min English broadcast, 40-min English documentary with music) reproduced the well-documented large-v3 long-form repetition-loop failure: the V3 weights enter an infinite-repetition state on long-form audio regardless of decoder configuration. `WithNoContext()` and the standard temperature-fallback chain (`WithTemperatureInc(0.2)` + `WithLogProbThreshold(-1.0)` + `WithEntropyThreshold(2.4)`) both had no effect. Switching to large-v2 weights resolves the loop while leaving Korean clean-clip quality essentially unchanged at the semantic level (~1.1 % CER difference, mostly Korean spacing and Arabic-numeral / Hangul-numeral surface conventions). See `tools/AudioBenchmark/baseline-2026-04-27.md` and `tools/AudioBenchmark/results/2026-04-27-v2-validation.csv` for raw numbers.
+
+### Migration
+
+- **Cache cleanup**: existing installations carry `~/.fieldcure/whisper-models/ggml-large-v3.bin` (≈ 3 GB) which is no longer referenced. Delete manually if disk space matters; the package itself never reads the file again. The replacement `ggml-large-v2.bin` (≈ 3 GB) is downloaded on first transcription after upgrade.
+- **Quality**: long-form WER on this v0.2.1 baseline drops from 100 %+ (looped) to ~2.5 % on the test corpus. Korean short-clip CER may differ ~1.1 % vs prior V3 output; review existing transcripts if exact-match comparisons matter.
+- **API**: no public surface changes. `WhisperModelSize` enum, `AudioExtractionOptions`, `WhisperEnvironment.RecommendModelSize` all unchanged.
 
 ## v0.2.0 - 2026-04-27
 
