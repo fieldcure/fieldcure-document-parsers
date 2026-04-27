@@ -270,3 +270,22 @@ SigningSettings.props
 
 # Plans
 todo/
+
+# AudioBenchmark outputs and copyrighted-source assets:
+#  - transcripts/ subdirectories contain transcribed text that may carry
+#    over the source audio's copyright (audiobook narration, broadcasts).
+#  - samples/ is a convention for colocating audio with the repo on a
+#    developer's machine; audio bodies stay out of git regardless.
+#  - results/ (quantitative CSVs) is the exception: numeric metrics carry
+#    no copyright, and they are the trace behind v0.2.x patch decisions —
+#    NOT ignored, intentionally committed.
+tools/AudioBenchmark/transcripts/
+tools/AudioBenchmark/*-transcripts/
+# Use samples/* (not samples/) so re-inclusion works — git can't re-include
+# files under a fully-ignored parent directory.
+tools/AudioBenchmark/samples/*
+!tools/AudioBenchmark/samples/README-samples.md
+
+# Ground-truth text files paired with audio samples — copyright-sensitive
+# unless the source is public domain. Treated the same as the audio.
+*.gt.txt

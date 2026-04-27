@@ -1,0 +1,2 @@
+﻿config,timestamp,file_name,audio_duration_seconds,model_size,cold_start_seconds,transcription_seconds,rtf,peak_working_set_mb,transcript_char_count,runtime_used,error,gt_available,wer,cer,gt_word_count
+default,2026-04-27T07:33:07.9282973Z,se-nation-first-europeans.mp3,951.516,Large,24.434,21.269,0.0224,603,8202,reported_cuda=true;reported_vulkan=true,,true,0.0220,0.0211,1407

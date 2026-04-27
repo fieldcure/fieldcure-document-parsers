@@ -1,0 +1,2 @@
+﻿config,timestamp,file_name,audio_duration_seconds,model_size,cold_start_seconds,transcription_seconds,rtf,peak_working_set_mb,transcript_char_count,runtime_used,error,gt_available,wer,cer,gt_word_count
+default,2026-04-27T07:35:19.8500747Z,Five Wonders of our Universe Universe BBC Earth Science - BBC Earth Science (64k).mp3,2394.288,Large,58.654,56.373,0.0235,1274,21533,reported_cuda=true;reported_vulkan=true,,true,0.0258,0.0157,3909

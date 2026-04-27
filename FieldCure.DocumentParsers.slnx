@@ -26,4 +26,8 @@
     <Project Path="src/DocumentParsers.Audio.Tests/DocumentParsers.Audio.Tests.csproj" />
   </Folder>
 
+  <Folder Name="/tools/">
+    <Project Path="tools/AudioBenchmark/AudioBenchmark.csproj" />
+  </Folder>
+
 </Solution>

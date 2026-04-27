@@ -1,0 +1,8 @@
+﻿"config","timestamp","file_name","audio_duration_seconds","model_size","cold_start_seconds","transcription_seconds","rtf","peak_working_set_mb","transcript_char_count","runtime_used","error","gt_available","wer","cer","gt_word_count"
+"default","2026-04-27T05:22:28.6161909Z","se-nation-first-europeans.mp3","951.516","Tiny","4.079","3.684","0.0039","482","8156","reported_cuda=true;reported_vulkan=true","","true","0.0490","0.0273","1407"
+"default","2026-04-27T05:22:38.4352846Z","se-nation-first-europeans.mp3","951.516","Base","4.560","4.463","0.0047","732","8166","reported_cuda=true;reported_vulkan=true","","true","0.0355","0.0230","1407"
+"default","2026-04-27T05:22:53.6327889Z","se-nation-first-europeans.mp3","951.516","Small","7.427","6.972","0.0073","842","8209","reported_cuda=true;reported_vulkan=true","","true","0.0306","0.0239","1407"
+"default","2026-04-27T05:23:25.3528549Z","se-nation-first-europeans.mp3","951.516","Medium","16.147","14.763","0.0155","873","8228","reported_cuda=true;reported_vulkan=true","","true","0.0249","0.0211","1407"
+"default","2026-04-27T05:25:22.1859274Z","se-nation-first-europeans.mp3","951.516","Large","58.837","56.874","0.0598","919","18667","reported_cuda=true;reported_vulkan=true","","true","1.9168","1.5565","1407"
+"no_context","2026-04-27T05:42:22.6507702Z","se-nation-first-europeans.mp3","951.516","Large","53.334","55.654","0.0585","634","18667","reported_cuda=true;reported_vulkan=true","","true","1.9168","1.5565","1407"
+"fallback_full","2026-04-27T05:48:32.6166021Z","se-nation-first-europeans.mp3","951.516","Large","56.324","55.769","0.0586","632","18667","reported_cuda=true;reported_vulkan=true","","true","1.9168","1.5565","1407"
