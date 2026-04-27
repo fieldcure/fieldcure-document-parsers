@@ -196,9 +196,26 @@ public class WhisperModelProvider
     /// <summary>
     /// Returns the default per-user model cache directory.
     /// </summary>
+    /// <remarks>
+    /// On Windows, models cache under <c>%LOCALAPPDATA%\FieldCure\WhisperModels</c>
+    /// to match the rest of the FieldCure ecosystem (Mcp.Rag KB stores,
+    /// AssistStudio data, etc.). On Unix, the dot-prefixed home convention
+    /// (<c>~/.fieldcure/whisper-models</c>) is preserved. Earlier versions
+    /// also placed the Windows cache under <c>%USERPROFILE%\.fieldcure</c>;
+    /// see RELEASENOTES.md for a one-shot migration note.
+    /// </remarks>
     /// <returns>Default model cache directory.</returns>
     private static string GetDefaultCacheDirectory()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrWhiteSpace(localAppData))
+                return Path.Combine(localAppData, "FieldCure", "WhisperModels");
+            // Fall through to Unix-style fallback if LocalApplicationData
+            // is somehow unavailable (rare; minimal Windows containers).
+        }
+
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (string.IsNullOrWhiteSpace(userProfile))
         {

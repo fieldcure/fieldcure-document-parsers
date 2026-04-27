@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <AssemblyName>FieldCure.DocumentParsers.Audio</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Audio</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -23,7 +23,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v0.2.1 - WhisperModelSize.Large now maps to GgmlType.LargeV2 instead of LargeV3 to avoid long-form repetition-loop hallucinations in large-v3. Cache filename changes to ggml-large-v2.bin; the previous ggml-large-v3.bin (~3 GB) becomes orphaned and can be deleted manually from {UserProfile}/.fieldcure/whisper-models/. Korean clean-clip CER regresses ~1.1 % vs v3 (mostly spacing / numeric-notation conventions); long-form WER drops from 100 %+ to ~2.5 %. See tools/AudioBenchmark/baseline-2026-04-27.md for the measurements behind this decision.
+      v0.2.2 - Whisper model cache directory on Windows moves from %USERPROFILE%\.fieldcure\whisper-models to %LOCALAPPDATA%\FieldCure\WhisperModels to match the rest of the FieldCure ecosystem (Mcp.Rag, AssistStudio). Unix path (~/.fieldcure/whisper-models) is unchanged. No automatic migration: existing models are re-downloaded on first use unless the user copies the cache manually (see RELEASENOTES.md).
     </PackageReleaseNotes>
   </PropertyGroup>
 
