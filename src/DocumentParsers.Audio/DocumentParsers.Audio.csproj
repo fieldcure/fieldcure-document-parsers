@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <AssemblyName>FieldCure.DocumentParsers.Audio</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Audio</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -23,7 +23,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v0.1.0 - Initial audio parser package. Adds AudioDocumentParser, IAudioTranscriber, WhisperTranscriber, local ggml model caching, NAudio conversion to 16 kHz mono WAV, and DocumentParserFactoryAudioExtensions.AddAudioSupport().
+      v0.2.0 - Adds WhisperEnvironment for environment-aware Whisper model size recommendation (Tiny→Large) based on detected GPU/RAM/cores, plus AudioExtractionOptions.WithModelSize for partial overrides. No breaking changes.
     </PackageReleaseNotes>
   </PropertyGroup>
 
