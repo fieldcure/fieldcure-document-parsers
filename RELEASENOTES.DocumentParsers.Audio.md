@@ -1,5 +1,57 @@
 ﻿# FieldCure.DocumentParsers.Audio Release Notes
 
+## v0.3.0 - 2026-04-28
+
+### Added
+
+- **Three-phase capability lifecycle** for Whisper runtime acquisition: `Detect` (host inspection) → `Provision` (binary acquisition) → `Activate` (Whisper.net configuration). Each phase is observable and overridable independently.
+- `IWhisperRuntimeProvisioner` — pluggable provisioner abstraction (`GetManifestAsync`, `IsProvisioned`, `ProvisionAsync`, `CacheDirectory`).
+- `GitHubReleasesWhisperRuntimeProvisioner` — default implementation that fetches `manifest.json` + per-variant binaries from [`fieldcure-whisper-runtimes`](https://github.com/fieldcure/fieldcure-whisper-runtimes) (GitHub Releases), verifies SHA-256, and caches under `%LOCALAPPDATA%\FieldCure\WhisperRuntimes\`. Supports concurrent processes via per-target `SemaphoreSlim` + atomic `File.Move` overwrite; orphaned `.download.<guid>` temp files are swept on construction.
+- `WhisperRuntime.Activate(...)` / `WhisperRuntime.GetActivationStatus()` — explicit configuration of `Whisper.net`'s `RuntimeOptions.LibraryPath` against the cache directory of a chosen variant. Idempotent; the first call wins, subsequent calls report the existing activation.
+- `AudioExtractionOptions.ProgressCallback` (`IProgress<WhisperRuntimeProgress>?`) — receives `Resolving` / `Downloading` / `Verifying` phase events with file name and transferred bytes (throttled to ~1 update / 256 KB during download).
+- `WhisperEnvironment.Detect()` — successor to `Probe()` with the same return shape plus `CudaDriverVersion`. `Probe()` is retained as an `[Obsolete]` alias and will be removed in v0.4.
+- `WhisperEnvironmentInfo.CudaDriverVersion` (int) — driver version reported by `cuDriverGetVersion` (e.g. `12000` = CUDA 12.0). Used to gate the `cuda` variant against the manifest's `minDriverVersion` policy.
+- `FIELDCURE_WHISPER_RUNTIME_DIR` environment variable — when set, the provisioner skips all network calls and treats the directory as authoritative (pre-staged manifest + binaries). For air-gapped deployments and CI hermeticity.
+- New opt-in `[TestCategory("Integration")]` fixtures `WhisperNetSampleTests` (bush.wav / kennedy.mp3 / multichannel.wav from upstream whisper.net), gated on `FIELDCURE_AUDIO_ENABLE_WHISPER_FIXTURE_TESTS=1` + `FIELDCURE_WHISPER_MODEL_PATH`. Default `dotnet test` runs remain offline.
+
+### Changed
+
+- **Cuda and Vulkan native binaries are no longer bundled** in the NuGet package. `Whisper.net.Runtime.Cuda.Windows` and `Whisper.net.Runtime.Vulkan` `PackageReference`s are removed from `DocumentParsers.Audio.csproj`; only the CPU runtime (`Whisper.net.Runtime` 1.9.0) remains in-package. GPU runtimes are fetched on first GPU use from `fieldcure-whisper-runtimes`.
+- `WhisperEnvironmentInfo.CudaAvailable` renamed to `CudaDriverAvailable` (the original name now reflects the actual semantics: a driver is detected, not necessarily a usable runtime). The old name is retained as an `[Obsolete]` property aliasing the new one and will be removed in v0.4.
+
+### Why
+
+The package previously bundled all three native runtimes (CPU, CUDA, Vulkan), pushing the unpacked install footprint past 120 MB. Two pressures forced a runtime-download model:
+
+1. **NuGet package-size cap.** Downstream consumers like `FieldCure.Mcp.Rag` (a `dotnet tool` whose own native dependencies — Sqlite cross-RID, ~127 MB — already crowd nuget.org's 250 MB per-package limit) cannot afford to also carry GPU runtimes transitively. Splitting the runtimes off lets each consumer ship without the cap pressure regardless of whether they end up using GPU acceleration.
+2. **Pay-for-what-you-use.** Most hosts are CPU-only or use a single GPU vendor. Bundling all variants forced every install to carry ~120 MB of binaries it would never load. Runtime-download means each host fetches at most one GPU variant, and only if the corresponding driver is detected.
+
+### Migration
+
+- **API renames** are source-compatible — the old names still work with deprecation warnings in v0.3 and will be removed in v0.4:
+  - `WhisperEnvironment.Probe()` → `WhisperEnvironment.Detect()`
+  - `WhisperEnvironmentInfo.CudaAvailable` → `WhisperEnvironmentInfo.CudaDriverAvailable`
+- **First GPU transcription per host** triggers a one-time download of the chosen variant to `%LOCALAPPDATA%\FieldCure\WhisperRuntimes\`. Approximate sizes:
+  - `cpu` — bundled in the NuGet package (no download)
+  - `cuda` (win-x64) — ~75 MB on first CUDA transcription
+  - `vulkan` (win-x64) — ~49 MB on first Vulkan transcription
+
+  Subsequent transcriptions reuse the cache. SHA-256 hashes are verified at download time; cached files are not re-hashed on each load.
+- **CUDA hosts** must have an NVIDIA driver providing CUDA 12.x runtime (`cudart64_12.dll`, `cublas64_12.dll`, `cublasLt64_12.dll`) on the loader path. The v1.9.0 `fieldcure-whisper-runtimes` release does **not** redistribute these — the upstream `Whisper.net.Runtime.Cuda.Windows` 1.9.0 nupkg doesn't ship them either, and the consumer expects them resolved by the host CUDA runtime. The provisioner gates `cuda` selection on `WhisperEnvironmentInfo.CudaDriverVersion >= 12000` (driver R525+). Hosts below that fall back to `vulkan` if available, else `cpu`.
+- **Air-gapped / offline deployments** — pre-stage the cache and set `FIELDCURE_WHISPER_RUNTIME_DIR=<dir>`. The directory must contain `manifest.json` at its root plus `runtimes/<variant>/<rid>/<file>` mirroring the online cache layout. The provisioner performs zero network I/O when this variable is set; missing files raise `WhisperRuntimeMissingException` with the offending names. Layout reference:
+  ```
+  D:\offline\whisper-runtimes\
+  ├── manifest.json
+  └── runtimes\
+      ├── win-x64\           (cpu)
+      ├── cuda\win-x64\
+      └── vulkan\win-x64\
+  ```
+- **Manifest URL** is pinned in `GitHubReleasesWhisperRuntimeProvisioner.DefaultManifestUrl` and resolves to the v1.9.0 release of `fieldcure-whisper-runtimes`. Override via the constructor's `manifestUrl` parameter for forks or staged rollouts.
+- **Default cache directory** is `%LOCALAPPDATA%\FieldCure\WhisperRuntimes\` on Windows — sibling to the `WhisperModels\` cache introduced in v0.2.2. No auto-migration from any prior layout (v0.2 never persisted runtime binaries).
+
+---
+
 ## v0.2.2 - 2026-04-27
 
 ### Changed
