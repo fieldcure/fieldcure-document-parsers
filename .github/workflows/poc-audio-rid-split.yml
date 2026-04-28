@@ -1,0 +1,85 @@
+name: PoC Audio RID-split
+
+# Negative-result PoC (see poc/audio-rid-split/README.md). Auto-trigger removed —
+# conclusion proven locally; this workflow stays as a reproducibility scaffold
+# for anyone who wants to re-verify on a clean runner.
+on:
+  workflow_dispatch:
+
+jobs:
+  pack:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ['A', 'B1', 'B2', 'C']
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore src/DocumentParsers.Audio /p:PoCVariant=${{ matrix.variant }}
+
+      - name: Pack variant ${{ matrix.variant }}
+        run: dotnet pack src/DocumentParsers.Audio --no-restore -c Release -o artifacts/${{ matrix.variant }} /p:PoCVariant=${{ matrix.variant }}
+
+      - name: Inspect nupkg
+        shell: pwsh
+        run: |
+          $nupkg = Get-ChildItem "artifacts/${{ matrix.variant }}/*.nupkg" | Where-Object { $_.Name -notlike '*.symbols.nupkg' } | Select-Object -First 1
+          if ($null -eq $nupkg) {
+            Write-Error "No nupkg found for variant ${{ matrix.variant }}"
+            exit 1
+          }
+
+          $sizeMB = [math]::Round($nupkg.Length / 1MB, 2)
+          Write-Host "=== Variant ${{ matrix.variant }} ==="
+          Write-Host "File: $($nupkg.Name)"
+          Write-Host "Size: $sizeMB MB ($($nupkg.Length) bytes)"
+          Write-Host ""
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($nupkg.FullName)
+          try {
+            $runtimes = $zip.Entries | Where-Object { $_.FullName -like 'runtimes/*' }
+            if ($runtimes.Count -eq 0) {
+              Write-Host "(no runtimes/ entries)"
+            } else {
+              Write-Host "=== runtimes/ tree ($($runtimes.Count) entries) ==="
+              $runtimes | Sort-Object FullName | ForEach-Object {
+                "{0,12:N0}  {1}" -f $_.Length, $_.FullName
+              }
+
+              Write-Host ""
+              Write-Host "=== runtimes/ size by RID ==="
+              $runtimes | Group-Object { ($_.FullName -split '/')[1] } | ForEach-Object {
+                $totalMB = [math]::Round(($_.Group | Measure-Object Length -Sum).Sum / 1MB, 2)
+                "{0,-20}  {1,8} MB  ({2} files)" -f $_.Name, $totalMB, $_.Count
+              }
+            }
+
+            Write-Host ""
+            Write-Host "=== whisper.dll presence check ==="
+            $whisperWin = $zip.Entries | Where-Object { $_.FullName -eq 'runtimes/win-x64/native/whisper.dll' }
+            if ($whisperWin) {
+              Write-Host "win-x64 whisper.dll: PRESENT ($($whisperWin.Length) bytes)"
+            } else {
+              Write-Host "win-x64 whisper.dll: MISSING"
+            }
+          } finally {
+            $zip.Dispose()
+          }
+
+      - name: Upload nupkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg-${{ matrix.variant }}
+          path: artifacts/${{ matrix.variant }}/*.nupkg
+          retention-days: 14

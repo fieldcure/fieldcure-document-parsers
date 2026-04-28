@@ -51,9 +51,43 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
     <PackageReference Include="Whisper.net" Version="1.9.0" />
-    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
-    <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0" />
-    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" Condition="'$(PoCVariant)' != 'C'" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0" Condition="'$(PoCVariant)' != 'C'" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" Condition="'$(PoCVariant)' != 'C'" />
   </ItemGroup>
+
+  <!--
+    PoC: audio-rid-split (branch poc/audio-rid-split).
+    Activated by /p:PoCVariant=A|B1|B2|C. Property unset = original v0.2.2 behavior.
+      A  baseline (no extra mods; just version-stamp the nupkg)
+      B1 <RuntimeIdentifiers>win-x64</RuntimeIdentifiers> (plural)
+      B2 <RuntimeIdentifier>win-x64</RuntimeIdentifier>   (singular)
+      C  ExcludeAssets="native" on Whisper.net.Runtime.* + manual win-x64 native pack
+  -->
+  <PropertyGroup Condition="'$(PoCVariant)' != ''">
+    <Version>$(Version)-poc-$(PoCVariant)</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PoCVariant)' == 'B1'">
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PoCVariant)' == 'B2'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(PoCVariant)' == 'C'">
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" ExcludeAssets="native" GeneratePathProperty="true" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0" ExcludeAssets="native" GeneratePathProperty="true" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" ExcludeAssets="native" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <Target Name="IncludeWhisperWinNativePoCC" BeforeTargets="GenerateNuspec" Condition="'$(PoCVariant)' == 'C'">
+    <ItemGroup>
+      <None Include="$(PkgWhisper_net_Runtime)\runtimes\win-x64\native\*.*" Pack="true" PackagePath="runtimes/win-x64/native/" />
+      <None Include="$(PkgWhisper_net_Runtime_Cuda)\runtimes\win-x64\native\*.*" Pack="true" PackagePath="runtimes/win-x64/native/" />
+      <None Include="$(PkgWhisper_net_Runtime_Vulkan)\runtimes\win-x64\native\*.*" Pack="true" PackagePath="runtimes/win-x64/native/" />
+    </ItemGroup>
+  </Target>
 
 </Project>
