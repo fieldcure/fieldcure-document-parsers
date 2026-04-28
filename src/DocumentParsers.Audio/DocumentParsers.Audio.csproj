@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <AssemblyName>FieldCure.DocumentParsers.Audio</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Audio</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -23,7 +23,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v0.3.0 - Whisper GPU runtime moved from build-time bundling to runtime download. Cuda and Vulkan native binaries are no longer included in the package; they are fetched on first GPU use from https://github.com/fieldcure/fieldcure-whisper-runtimes (GitHub Releases) and cached under %LOCALAPPDATA%\FieldCure\WhisperRuntimes\. Three-phase capability lifecycle introduced: Detect (system inspection) / Provision (binary acquisition) / Activate (Whisper.net configuration). New API surface: WhisperEnvironment.Detect() (Probe() retained as an [Obsolete] alias, removed in v0.4), IWhisperRuntimeProvisioner, GitHubReleasesWhisperRuntimeProvisioner, WhisperRuntime.Activate / GetActivationStatus, AudioExtractionOptions.ProgressCallback. WhisperEnvironmentInfo.CudaAvailable renamed to CudaDriverAvailable (old name [Obsolete]) and gains CudaDriverVersion. Air-gapped environments: set FIELDCURE_WHISPER_RUNTIME_DIR to a pre-staged directory to skip all network calls. Audio.csproj drops Whisper.net.Runtime.Cuda and Whisper.net.Runtime.Vulkan PackageReferences; CPU runtime remains bundled.
+      v0.3.1 - Hotfix for WAVE_FORMAT_EXTENSIBLE PCM input. AudioConverter previously threw ArgumentException("Input must be PCM or IEEE float") on multi-channel WAVs whose fmt chunk uses formatTag 0xFFFE (the standard format for Windows capture pipelines and most modern DAWs), even when the underlying SubFormat was KSDATAFORMAT_SUBTYPE_PCM with byte-identical PCM samples. Fix: detect the extensible format tag, inspect the SubFormat GUID, and re-label the WaveFormat as standard PCM or IEEE float without converting any bytes. Multi-channel inputs now flow through to MediaFoundationResampler unchanged. Unknown SubFormats raise NotSupportedException with a clear message rather than the misleading downstream resampler error.
     </PackageReleaseNotes>
   </PropertyGroup>
 

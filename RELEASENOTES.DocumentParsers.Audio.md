@@ -1,5 +1,49 @@
 ﻿# FieldCure.DocumentParsers.Audio Release Notes
 
+## v0.3.1 - 2026-04-28
+
+### Fixed
+
+- **Multi-channel WAVE_FORMAT_EXTENSIBLE PCM input no longer fails to transcribe.**
+  `AudioConverter.ToPcm16kMono` previously threw
+  `ArgumentException("Input must be PCM or IEEE float (Parameter 'sourceProvider')")`
+  from `MediaFoundationResampler`'s constructor when fed a WAV whose `fmt`
+  chunk used `formatTag = 0xFFFE` (`WAVE_FORMAT_EXTENSIBLE`) — the standard
+  format for Windows capture pipelines, modern DAW exports, and any WAV with
+  more than two channels. The underlying samples in the typical case are
+  bit-identical to standard PCM (`SubFormat = KSDATAFORMAT_SUBTYPE_PCM`) but
+  the resampler refuses the format tag.
+
+  Fix: a normalization pass between `WaveFileReader` and the resampler
+  detects the extensible format tag, inspects the `SubFormat` GUID, and
+  re-labels the `WaveFormat` as standard `WAVE_FORMAT_PCM` (formatTag = 1)
+  or `WAVE_FORMAT_IEEE_FLOAT` (formatTag = 3) via a thin `WaveStream`
+  wrapper. **No byte conversion** — the bytes are already correct, only
+  the metadata was wrong from the resampler's point of view.
+
+  Unknown `SubFormat` GUIDs now raise `NotSupportedException` with a
+  message that names the offending GUID, instead of the cryptic downstream
+  "Input must be PCM or IEEE float" from `MediaFoundationResampler`.
+
+  Repro / regression coverage:
+  - `AudioConverterTests.ToPcm16kMono_AcceptsExtensiblePcmInput` — synthetic
+    2-channel `WAVE_FORMAT_EXTENSIBLE` PCM, verifies 16 kHz mono PCM output.
+  - `AudioConverterTests.ToPcm16kMono_AcceptsStandardPcmInput` — regression
+    guard that the normalization step is a no-op for non-extensible sources.
+  - `WhisperNetSampleTests.Whisper_MultichannelSample_DownmixesMultiChannelInput`
+    (opt-in integration) — end-to-end transcription of whisper.net's own
+    `multichannel.wav` sample (3-channel `WAVE_FORMAT_EXTENSIBLE` PCM).
+
+### Migration
+
+- **No API or behavior change** beyond the bug fix. Existing code paths that
+  fed standard PCM or IEEE float WAVs are unaffected — the normalization
+  step is a no-op for those.
+- Consumers pinned to `Version="0.3.*"` (the recommended pin pattern, used
+  by `FieldCure.Mcp.Rag` v2.4.0+) automatically pick up the hotfix.
+
+---
+
 ## v0.3.0 - 2026-04-28
 
 ### Added
