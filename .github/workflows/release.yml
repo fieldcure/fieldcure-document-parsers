@@ -19,8 +19,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          MESSAGE="${{ github.event.head_commit.message }}"
+          MESSAGE=$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)
 
           normalize_name() {
             case "$1" in
