@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>0.2.2</Version>
+    <Version>0.3.0</Version>
     <AssemblyName>FieldCure.DocumentParsers.Audio</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Audio</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -23,7 +23,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v0.2.2 - Whisper model cache directory on Windows moves from %USERPROFILE%\.fieldcure\whisper-models to %LOCALAPPDATA%\FieldCure\WhisperModels to match the rest of the FieldCure ecosystem (Mcp.Rag, AssistStudio). Unix path (~/.fieldcure/whisper-models) is unchanged. No automatic migration: existing models are re-downloaded on first use unless the user copies the cache manually (see RELEASENOTES.md).
+      v0.3.0 - Whisper GPU runtime moved from build-time bundling to runtime download. Cuda and Vulkan native binaries are no longer included in the package; they are fetched on first GPU use from https://github.com/fieldcure/fieldcure-whisper-runtimes (GitHub Releases) and cached under %LOCALAPPDATA%\FieldCure\WhisperRuntimes\. Three-phase capability lifecycle introduced: Detect (system inspection) / Provision (binary acquisition) / Activate (Whisper.net configuration). New API surface: WhisperEnvironment.Detect() (Probe() retained as an [Obsolete] alias, removed in v0.4), IWhisperRuntimeProvisioner, GitHubReleasesWhisperRuntimeProvisioner, WhisperRuntime.Activate / GetActivationStatus, AudioExtractionOptions.ProgressCallback. WhisperEnvironmentInfo.CudaAvailable renamed to CudaDriverAvailable (old name [Obsolete]) and gains CudaDriverVersion. Air-gapped environments: set FIELDCURE_WHISPER_RUNTIME_DIR to a pre-staged directory to skip all network calls. Audio.csproj drops Whisper.net.Runtime.Cuda and Whisper.net.Runtime.Vulkan PackageReferences; CPU runtime remains bundled.
     </PackageReleaseNotes>
   </PropertyGroup>
 
@@ -51,9 +51,10 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
     <PackageReference Include="Whisper.net" Version="1.9.0" />
+    <!-- v0.3: Whisper.net.Runtime CPU only. Cuda/Vulkan removed — fetched at runtime
+         from fieldcure-whisper-runtimes on first GPU use. See RELEASENOTES and the
+         design spec at https://github.com/fieldcure/fieldcure-document-parsers/tree/poc/audio-runtime-download -->
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
-    <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.9.0" />
-    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" />
   </ItemGroup>
 
 </Project>

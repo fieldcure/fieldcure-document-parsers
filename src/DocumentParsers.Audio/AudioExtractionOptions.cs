@@ -1,3 +1,4 @@
+using FieldCure.DocumentParsers.Audio.Runtime;
 using Whisper.net.LibraryLoader;
 
 namespace FieldCure.DocumentParsers.Audio;
@@ -45,6 +46,15 @@ public class AudioExtractionOptions : ExtractionOptions
     public bool IncludeTimestamps { get; init; } = true;
 
     /// <summary>
+    /// Optional progress reporter for v0.3 runtime provisioning. Fires during the
+    /// download / verify / activate phases of <see cref="Runtime.IWhisperRuntimeProvisioner.ProvisionAsync"/>
+    /// when a transcription call triggers a first-time runtime fetch. Whisper inference
+    /// progress (segment-level) is NOT exposed here — that flows through Whisper.net's
+    /// own segment callback API.
+    /// </summary>
+    public IProgress<WhisperRuntimeProgress>? ProgressCallback { get; init; }
+
+    /// <summary>
     /// Default audio extraction options.
     /// </summary>
     public static new AudioExtractionOptions Default { get; } = new();
@@ -82,5 +92,6 @@ public class AudioExtractionOptions : ExtractionOptions
             RuntimeLibraryOrder = RuntimeLibraryOrder,
             IncludeConfidence = IncludeConfidence,
             IncludeTimestamps = IncludeTimestamps,
+            ProgressCallback = ProgressCallback,
         };
 }
