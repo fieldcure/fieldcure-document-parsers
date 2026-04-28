@@ -1,7 +1,7 @@
 # PoC: DocumentParsers.Audio v0.3 — Whisper runtime download
 
 **Branch:** `poc/audio-runtime-download`
-**Status:** Design spec for review. Implementation lands in a separate `release/v0.3.0` branch once this design is signed off.
+**Status:** **Signed off (2026-04-28).** Q1 / Q4 / Q5 accepted as written. Q2 refined (manifest-vs-actual version mismatch is a warning log, not a hard fail). Q3 refined (minDriverVersion source of truth lives in the manifest, not Audio code). Cosmetic: orphan `.download.*` cleanup added to provisioner constructor; size estimate phrasing tightened. Implementation lands on `release/v0.3.0`.
 
 This PoC follows two earlier negative-result PoCs that ruled out alternate solutions:
 
@@ -32,6 +32,9 @@ public static class WhisperEnvironment
 
 public sealed record WhisperEnvironmentInfo(
     bool CudaDriverAvailable,    // nvcuda.dll exists in System32 (driver-installed)
+    int? CudaDriverVersion,      // null when driver not installed; otherwise nvcuda!cuDriverGetVersion result
+                                 // (e.g. 12030 = CUDA 12.3). Compared against manifest's minDriverVersion
+                                 // in Phase 3 to gate CudaUsable. Audio code does NOT hardcode the threshold.
     bool VulkanDriverAvailable,  // vulkan-1.dll exists in System32 (loader-installed)
     long SystemRamBytes,
     int LogicalCores);
@@ -95,6 +98,7 @@ Manifest format (sketch — lock down before first release):
       ]
     },
     "cuda": {
+      "minDriverVersion": 12000,
       "win-x64": [
         { "name": "whisper.dll",                   "url": "...", "sha256": "...", "bytes": 0 },
         { "name": "ggml-cuda-whisper.dll",         "url": "...", "sha256": "...", "bytes": 0 },
@@ -133,7 +137,14 @@ Layout in the cache directory (matches Whisper.net's expected probe paths):
             └── ggml-vulkan-whisper.dll
 ```
 
+**Manifest field semantics:**
+
+- `minDriverVersion` (variant-level, integer): minimum NVIDIA driver version, in `cuDriverGetVersion` integer form (e.g. `12000` = CUDA 12.0 = driver R525+, `12030` = CUDA 12.3 = driver R545+). Audio's Phase 3 reads this and gates `CudaUsable` on `WhisperEnvironmentInfo.CudaDriverVersion >= minDriverVersion`. **Source of truth lives in the manifest, not in Audio code.** Future multi-CUDA-major scenario (e.g., shipping both `cuda-12` and `cuda-13` variants) extends naturally — each variant carries its own `minDriverVersion`, Audio picks the highest-compatible at activation time.
+- `nvidiaRedist: true` (file-level, boolean): marks files governed by NVIDIA's CUDA Toolkit EULA Attachment A redistributable terms. **Primary use:** at first download of a file with this flag set, the provisioner emits a one-line NVIDIA EULA attribution to stderr (e.g., `[whisper-runtime] cudart64_12.dll: NVIDIA CUDA Toolkit components (https://docs.nvidia.com/cuda/eula/)`). Surfaces the license trail without requiring users to read our docs to discover it. **Secondary use:** audit-style listing (`whisper-runtime --list-redist`) is a trivial derivative for any future operator query, no extra plumbing needed. Files without `nvidiaRedist` (whisper.dll, ggml-*-whisper.dll) are MIT-licensed via Whisper.net.Runtime upstream and need no notice.
+
 **Concurrency model:** identical to `WhisperModelProvider`. Per-file `SemaphoreSlim` keyed by absolute target path. Two parallel `ProvisionAsync(Cuda)` calls: one downloads, the other waits at the gate, both observe the file present on completion. Cross-process: if two Mcp.Rag instances on the same machine race, both write to `<file>.download` (each gets its own random GUID-suffixed temp), one wins the `File.Move(overwrite: true)`, the other's move overwrites with byte-identical content. Acceptable.
+
+**Orphan cleanup at construction:** `WhisperRuntimeProvisioner` constructor sweeps `<CacheDirectory>/runtimes/**/*.download.*` and deletes any matches. Catches the case where a previous process was killed mid-download (Ctrl+C, host shutdown, host OOM). Cheap (file enumeration only, no I/O on success path) and prevents unbounded `.download.<guid>` accumulation across restarts. Fail-soft: enumeration failures (permission denied on a corrupted dir) are swallowed with a debug log.
 
 **Hash verification:** every downloaded file checked against `sha256` from the manifest before `File.Move` to final location. Mismatch → delete temp, throw `WhisperRuntimeIntegrityException`. No partial writes ever land in the cache.
 
@@ -158,7 +169,7 @@ public static class WhisperRuntime
 
 public sealed record WhisperActivationStatus(
     bool CpuUsable,
-    bool CudaUsable,    // Driver present AND cuda variant provisioned
+    bool CudaUsable,    // Driver present AND CudaDriverVersion >= manifest's cuda.minDriverVersion AND cuda variant provisioned
     bool VulkanUsable,  // Driver present AND vulkan variant provisioned
     string LibraryPath);
 ```
@@ -259,9 +270,9 @@ If env var unset → standard path (`%LOCALAPPDATA%\FieldCure\WhisperRuntimes\`)
 
 1. **GitHub Releases vs nuget.org-fetch fallback.** PoC 0 ranked options as B (nuget.org) > C (add-on package) > A (manual install) under license-blocker assumption. License is *not* blocked, so primary path is GitHub Releases. Should we still wire B as a fallback when GH Releases is unreachable (rate-limit, regional block)? Recommend **no for v0.3, yes for v0.4** — keep PoC scope tight; B fallback is a 200-line add when needed.
 
-2. **Manifest hosting and version pinning.** Manifest URL pinned to `v1.9.0` (matching Whisper.net version). When we upgrade to Whisper.net 2.x, do we cut a new manifest tag (`v2.0.0`) or version the manifest schema independently? Recommend **manifest version tracks Whisper.net version** for v0.3; revisit if we ever support multiple Whisper.net versions in one Audio release.
+2. **Manifest hosting and version pinning.** ✅ Resolved. Manifest URL is pinned to the *exact Whisper.net version Audio was tested against* (e.g., `v1.9.0`). Manifest tag bumps follow native ABI changes: major (1.x → 2.x) always cuts a new tag; minor (1.9 → 1.10) almost always; patch (1.9.0 → 1.9.1) usually same natives, occasionally new tag. To handle drift between the Audio package's compiled-against `Whisper.net` version and the manifest's `whisperNetRuntimeVersion` field, Audio compares the two at startup and emits a **warning log** (not a hard fail) on mismatch. Override-mode (`FIELDCURE_WHISPER_RUNTIME_DIR`) bypasses the network manifest fetch but still loads the local manifest copy for hash + version-warning logic.
 
-3. **Cuda variant selection: which CUDA major?** `Whisper.net.Runtime.Cuda` 1.9.0 ships against CUDA 12.x runtime DLLs (`cudart64_12.dll`). If a user's NVIDIA driver is older than the minimum compatible version (CUDA 12.0 requires driver R525+), Cuda activation will fail at `whisper.dll` load. Recommend **detect driver version in Phase 1**, expose `CudaDriverVersion` in `WhisperEnvironmentInfo`, gate `CudaUsable` on minimum threshold. Implementation: read driver version from registry `HKLM\SOFTWARE\NVIDIA Corporation\Global\NVTweak\Devices\NvAPI` or call `nvcuda!cuDriverGetVersion`.
+3. **Cuda variant selection: minimum driver version source of truth.** ✅ Resolved. Lives in the **manifest** (`cuda.minDriverVersion`), not hardcoded in Audio. Audio's contract: read driver version via `nvcuda!cuDriverGetVersion`, expose as `WhisperEnvironmentInfo.CudaDriverVersion`. Phase 3 (`GetActivationStatus`) compares to manifest field and gates `CudaUsable`. This makes the manifest self-contained — `whisper-runtimes` repo owns the policy, Audio just reports environment facts. Future multi-CUDA-major (12 + 13 in one release) extends naturally: each variant carries its own `minDriverVersion`, Audio picks the highest-compatible at activation. Why not the alternative (registry lookup, hardcoded threshold): registry path is fragile across driver versions, and hardcoding forces Audio releases on every CUDA-major bump even when only the manifest needs updating.
 
 4. **Multi-process cache races.** Two Mcp.Rag instances starting simultaneously, both detecting Cuda needed, both calling `ProvisionAsync`. In-process `SemaphoreSlim` doesn't synchronize across processes. Risk: both write `<file>.download.<guid>` then both call `File.Move(overwrite: true)`. Outcome: one move's content is final, the other overwrites with byte-identical content. **Acceptable**, but worth mentioning in design log so future readers don't add a (slower, more fragile) cross-process lock.
 
@@ -283,7 +294,7 @@ If this design is signed off, the v0.3.0 implementation order:
 4. Wire `ExtractText` lazy provisioning + `WhisperRuntime.Activate`.
 5. Manifest schema + initial Releases set up at `fieldcure/whisper-runtimes`.
 6. Integration test: tear down cache dir, call `ExtractText` on a 10-second mp3, assert end-to-end download → transcribe.
-7. Mcp.Rag v2.4.0 follow-up: depend on Audio v0.3, drop direct `Whisper.net.Runtime` PackageReference, restore `.Cuda` / `.Vulkan` removal from csproj. Tool nupkg returns to ~138 MB CPU-only with GPU acceleration available on first invocation post-install.
+7. Mcp.Rag v2.4.0 follow-up: depend on Audio v0.3, drop direct `Whisper.net.Runtime` PackageReference, restore `.Cuda` / `.Vulkan` removal from csproj. Tool nupkg lands in the ~140-150 MB range (multi-RID Sqlite + CPU Whisper transitive multi-RID + everything else; exact size confirmed at v2.4.0 pack time), well under the 250 MB cap, with GPU acceleration available on first GPU-using invocation post-install via runtime download.
 
 ## Decision log
 
@@ -292,3 +303,7 @@ If this design is signed off, the v0.3.0 implementation order:
 - **2026-04-28:** `IProgress<T>` over `Action<T>` for progress. Standard .NET pattern; cross-thread safe with captured `SynchronizationContext`.
 - **2026-04-28:** GitHub Releases over NuGet-fetch fallback for v0.3. License-not-blocked makes GH Releases the primary; nuget.org fallback deferred to v0.4 if needed.
 - **2026-04-28:** Manifest version tracks Whisper.net version (`v1.9.0`). Independent versioning deferred until multi-version support is real.
+- **2026-04-28:** Manifest-vs-actual `Whisper.net` version mismatch is a *warning log*, not a fail. Hard fail would block legitimate patch-level upgrades where ABI is unchanged; warning preserves user agency and surfaces telemetry for future investigation.
+- **2026-04-28:** Minimum CUDA driver version lives in the manifest (`cuda.minDriverVersion`), not in Audio code. `whisper-runtimes` repo is single source of truth for runtime-selection policy; Audio reports environment facts only. Enables multi-CUDA-major variants without Audio releases.
+- **2026-04-28:** `nvidiaRedist: true` flag's primary use is per-file EULA attribution at first download (stderr one-liner). Audit-listing is a derivative use. Files without the flag are MIT-licensed and need no notice.
+- **2026-04-28:** `WhisperRuntimeProvisioner` constructor sweeps `<cache>/runtimes/**/*.download.*` orphans on init. Catches mid-download cancellations across process lifetimes; cheap and fail-soft.
