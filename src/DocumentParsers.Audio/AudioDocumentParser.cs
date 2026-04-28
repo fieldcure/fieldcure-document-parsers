@@ -1,5 +1,6 @@
 using FieldCure.DocumentParsers.Audio.Conversion;
 using FieldCure.DocumentParsers.Audio.Formatting;
+using FieldCure.DocumentParsers.Audio.Runtime;
 using FieldCure.DocumentParsers.Audio.Transcription;
 
 namespace FieldCure.DocumentParsers.Audio;
@@ -9,14 +10,20 @@ namespace FieldCure.DocumentParsers.Audio;
 /// </summary>
 public sealed class AudioDocumentParser : IDocumentParser, IAsyncDisposable
 {
+    private static readonly Lazy<GitHubReleasesWhisperRuntimeProvisioner> s_defaultProvisioner =
+        new(() => new GitHubReleasesWhisperRuntimeProvisioner(),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
     private readonly IAudioTranscriber _transcriber;
     private readonly bool _ownsTranscriber;
+    private readonly IWhisperRuntimeProvisioner _provisioner;
 
     /// <summary>
-    /// Creates an audio parser using the default Whisper.net transcriber.
+    /// Creates an audio parser using the default Whisper.net transcriber and the
+    /// default <see cref="GitHubReleasesWhisperRuntimeProvisioner"/>.
     /// </summary>
     public AudioDocumentParser()
-        : this(new WhisperTranscriber(), ownsTranscriber: true)
+        : this(new WhisperTranscriber(), ownsTranscriber: true, provisioner: null)
     {
     }
 
@@ -25,20 +32,35 @@ public sealed class AudioDocumentParser : IDocumentParser, IAsyncDisposable
     /// </summary>
     /// <param name="transcriber">Transcriber used to produce transcript segments.</param>
     public AudioDocumentParser(IAudioTranscriber transcriber)
-        : this(transcriber, ownsTranscriber: false)
+        : this(transcriber, ownsTranscriber: false, provisioner: null)
+    {
+    }
+
+    /// <summary>
+    /// Creates an audio parser with a custom transcriber and provisioner. Useful for
+    /// tests that need to inject a fake provisioner pointing at a hand-rolled local
+    /// manifest.
+    /// </summary>
+    /// <param name="transcriber">Transcriber used to produce transcript segments.</param>
+    /// <param name="provisioner">Provisioner whose cache directory is wired into
+    /// Whisper.net's loader on first transcription.</param>
+    public AudioDocumentParser(IAudioTranscriber transcriber, IWhisperRuntimeProvisioner provisioner)
+        : this(transcriber, ownsTranscriber: false, provisioner: provisioner)
     {
     }
 
     /// <summary>
     /// Creates an audio parser and records whether it owns the transcriber's lifetime.
     /// </summary>
-    /// <param name="transcriber">Transcriber used to produce transcript segments.</param>
-    /// <param name="ownsTranscriber">Whether this parser should dispose the transcriber.</param>
-    private AudioDocumentParser(IAudioTranscriber transcriber, bool ownsTranscriber)
+    private AudioDocumentParser(
+        IAudioTranscriber transcriber,
+        bool ownsTranscriber,
+        IWhisperRuntimeProvisioner? provisioner)
     {
         ArgumentNullException.ThrowIfNull(transcriber);
         _transcriber = transcriber;
         _ownsTranscriber = ownsTranscriber;
+        _provisioner = provisioner ?? s_defaultProvisioner.Value;
     }
 
     /// <inheritdoc />
@@ -101,6 +123,9 @@ public sealed class AudioDocumentParser : IDocumentParser, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(stream);
 
         options ??= AudioExtractionOptions.Default;
+
+        await EnsureRuntimeProvisionedAsync(options, cancellationToken).ConfigureAwait(false);
+
         using var pcmStream = AudioConverter.ToPcm16kMono(stream, options.SourceExtension);
 
         var segments = new List<TranscriptSegment>();
@@ -112,6 +137,38 @@ public sealed class AudioDocumentParser : IDocumentParser, IAsyncDisposable
         }
 
         return MarkdownFormatter.Format(segments, options);
+    }
+
+    /// <summary>
+    /// Phase 2 + 3 of the v0.3 capability lifecycle. Selects the best variant for the
+    /// host (Cuda &gt; Vulkan &gt; Cpu, gated by driver presence and manifest policy),
+    /// downloads it on first call (idempotent thereafter), then activates Whisper.net's
+    /// loader against the provisioner's cache directory.
+    /// </summary>
+    /// <remarks>
+    /// <para>Activation is a one-time per-process side effect — Whisper.net caches its
+    /// first successful probe. Subsequent calls only re-check provisioning, which is a
+    /// cheap file-existence test once the cache is warm.</para>
+    /// <para>Skipped entirely when the consumer injected a custom <see cref="IAudioTranscriber"/>
+    /// (<c>_ownsTranscriber == false</c>): injection signals "I'm bringing my own
+    /// transcription stack, do not touch Whisper.net's loader on my behalf." This keeps
+    /// fakes / mocks / out-of-process transcribers usable without forcing a manifest fetch.</para>
+    /// </remarks>
+    private async Task EnsureRuntimeProvisionedAsync(
+        AudioExtractionOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (!_ownsTranscriber) return;
+
+        var variant = WhisperRuntime.SelectPreferredVariant(_provisioner);
+
+        if (!_provisioner.IsProvisioned(variant))
+        {
+            await _provisioner.ProvisionAsync(variant, cancellationToken, options.ProgressCallback)
+                .ConfigureAwait(false);
+        }
+
+        WhisperRuntime.Activate(_provisioner);
     }
 
     /// <inheritdoc />

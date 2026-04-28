@@ -344,21 +344,21 @@ internal static class Program
     private static string DescribeRuntime()
     {
         // Whisper.net does not expose its resolved runtime at the IAudioTranscriber
-        // contract level. We record the Probe flags so analysis can correlate
-        // measured RTF with CUDA/Vulkan availability without extra plumbing.
-        var probe = WhisperEnvironment.Probe();
-        return $"reported_cuda={probe.CudaAvailable.ToString().ToLowerInvariant()};reported_vulkan={probe.VulkanAvailable.ToString().ToLowerInvariant()}";
+        // contract level. We record the Detect() flags so analysis can correlate
+        // measured RTF with CUDA/Vulkan driver presence without extra plumbing.
+        var info = WhisperEnvironment.Detect();
+        return $"reported_cuda={info.CudaDriverAvailable.ToString().ToLowerInvariant()};reported_vulkan={info.VulkanDriverAvailable.ToString().ToLowerInvariant()}";
     }
 
     private static void EmitProbeBanner(BenchmarkOptions options)
     {
-        var probe = WhisperEnvironment.Probe();
+        var info = WhisperEnvironment.Detect();
         var recommended = WhisperEnvironment.RecommendModelSize();
-        Console.Error.WriteLine("=== Whisper Environment Probe ===");
-        Console.Error.WriteLine($"  CUDA reported  : {probe.CudaAvailable}");
-        Console.Error.WriteLine($"  Vulkan reported: {probe.VulkanAvailable}");
-        Console.Error.WriteLine($"  System RAM     : {probe.SystemRamBytes / (1024L * 1024 * 1024)} GB");
-        Console.Error.WriteLine($"  Logical cores  : {probe.LogicalCores}");
+        Console.Error.WriteLine("=== Whisper Environment Detect ===");
+        Console.Error.WriteLine($"  CUDA driver    : {info.CudaDriverAvailable} (version: {info.CudaDriverVersion?.ToString() ?? "n/a"})");
+        Console.Error.WriteLine($"  Vulkan driver  : {info.VulkanDriverAvailable}");
+        Console.Error.WriteLine($"  System RAM     : {info.SystemRamBytes / (1024L * 1024 * 1024)} GB");
+        Console.Error.WriteLine($"  Logical cores  : {info.LogicalCores}");
         Console.Error.WriteLine($"  Recommend()    : {recommended} (QualityBias.Accuracy default)");
         Console.Error.WriteLine($"  Models in run  : {string.Join(", ", options.Models)}");
         Console.Error.WriteLine($"  Warmup enabled : {options.Warmup}");
