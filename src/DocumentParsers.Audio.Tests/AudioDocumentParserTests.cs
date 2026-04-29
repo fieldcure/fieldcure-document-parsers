@@ -1,3 +1,4 @@
+﻿using System.Runtime.CompilerServices;
 using FieldCure.DocumentParsers.Audio.Transcription;
 
 namespace FieldCure.DocumentParsers.Audio.Tests;
@@ -66,6 +67,45 @@ public class AudioDocumentParserTests
     }
 
     /// <summary>
+    /// Verifies that metadata reflects the model size reported by the transcriber.
+    /// </summary>
+    [TestMethod]
+    public void ExtractText_WhenTranscriberReportsModelSize_UsesReportedModelInMetadata()
+    {
+        var parser = new AudioDocumentParser(new ModelSizeReportingTranscriber(
+            WhisperModelSize.Large,
+            new TranscriptSegment(TimeSpan.Zero, TimeSpan.FromSeconds(1), "large model text")));
+
+        var markdown = parser.ExtractText(CreateSilentWav(), new AudioExtractionOptions
+        {
+            SourceExtension = ".wav",
+            ModelSize = WhisperModelSize.Base
+        });
+
+        StringAssert.Contains(markdown, "| Model | large |");
+        Assert.IsFalse(markdown.Contains("| Model | base |", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Verifies that metadata falls back to caller options when no effective size is reported.
+    /// </summary>
+    [TestMethod]
+    public void ExtractText_WhenTranscriberDoesNotReportModelSize_UsesOptionsModelInMetadata()
+    {
+        var parser = new AudioDocumentParser(new TestAudioTranscriber(
+            new TranscriptSegment(TimeSpan.Zero, TimeSpan.FromSeconds(1), "small model text")));
+
+        var markdown = parser.ExtractText(CreateSilentWav(), new AudioExtractionOptions
+        {
+            SourceExtension = ".wav",
+            ModelSize = WhisperModelSize.Small
+        });
+
+        StringAssert.Contains(markdown, "| Model | small |");
+        Assert.IsFalse(markdown.Contains("| Model | base |", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// Verifies that the factory extension registers the audio parser.
     /// </summary>
     [TestMethod]
@@ -77,6 +117,52 @@ public class AudioDocumentParserTests
         var parser = DocumentParserFactory.GetParser(".mp3");
 
         Assert.IsInstanceOfType<AudioDocumentParser>(parser);
+    }
+
+    /// <summary>
+    /// Test transcriber that exposes the effective model size used internally.
+    /// </summary>
+    private sealed class ModelSizeReportingTranscriber : IAudioTranscriber, IModelSizeReporting
+    {
+        /// <summary>
+        /// Transcript segments emitted by the test transcriber.
+        /// </summary>
+        private readonly TranscriptSegment[] _segments;
+
+        /// <summary>
+        /// Creates a test transcriber with a reported model size.
+        /// </summary>
+        /// <param name="modelSize">Model size reported as the effective model.</param>
+        /// <param name="segments">Transcript segments to emit.</param>
+        public ModelSizeReportingTranscriber(
+            WhisperModelSize modelSize,
+            params TranscriptSegment[] segments)
+        {
+            EffectiveModelSize = modelSize;
+            _segments = segments;
+        }
+
+        /// <summary>
+        /// Gets the model size reported as the effective transcription model.
+        /// </summary>
+        public WhisperModelSize? EffectiveModelSize { get; }
+
+        /// <inheritdoc />
+        public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
+            Stream pcmStream,
+            AudioExtractionOptions options,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            foreach (var segment in _segments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await Task.Yield();
+                yield return segment;
+            }
+        }
+
+        /// <inheritdoc />
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     /// <summary>

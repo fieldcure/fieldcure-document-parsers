@@ -136,7 +136,13 @@ public sealed class AudioDocumentParser : IDocumentParser, IAsyncDisposable
             segments.Add(segment);
         }
 
-        return MarkdownFormatter.Format(segments, options);
+        var formattingOptions =
+            _transcriber is IModelSizeReporting reporter
+            && reporter.EffectiveModelSize is { } effectiveModelSize
+                ? options.WithModelSize(effectiveModelSize)
+                : options;
+
+        return MarkdownFormatter.Format(segments, formattingOptions);
     }
 
     /// <summary>
