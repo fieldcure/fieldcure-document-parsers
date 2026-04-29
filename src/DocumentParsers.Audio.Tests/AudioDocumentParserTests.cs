@@ -87,6 +87,30 @@ public class AudioDocumentParserTests
     }
 
     /// <summary>
+    /// Verifies that a reporter-supplied effective size overrides the caller-supplied
+    /// <see cref="AudioExtractionOptions.ModelPath"/> in the rendered metadata header.
+    /// Without this, the formatter's path-wins policy would mask transcriber overrides.
+    /// </summary>
+    [TestMethod]
+    public void ExtractText_WhenTranscriberReportsModelSize_OverridesCallerModelPathInMetadata()
+    {
+        var parser = new AudioDocumentParser(new ModelSizeReportingTranscriber(
+            WhisperModelSize.Large,
+            new TranscriptSegment(TimeSpan.Zero, TimeSpan.FromSeconds(1), "large model text")));
+
+        var markdown = parser.ExtractText(CreateSilentWav(), new AudioExtractionOptions
+        {
+            SourceExtension = ".wav",
+            ModelSize = WhisperModelSize.Base,
+            ModelPath = "/tmp/ggml-base.bin"
+        });
+
+        StringAssert.Contains(markdown, "| Model | large |");
+        Assert.IsFalse(markdown.Contains("ggml-base.bin", StringComparison.Ordinal),
+            "Caller-supplied ModelPath must not leak into the header when reporter overrides.");
+    }
+
+    /// <summary>
     /// Verifies that metadata falls back to caller options when no effective size is reported.
     /// </summary>
     [TestMethod]

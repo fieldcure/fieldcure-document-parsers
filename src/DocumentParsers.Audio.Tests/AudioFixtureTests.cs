@@ -1,4 +1,4 @@
-using FieldCure.DocumentParsers.Audio.Transcription;
+﻿using FieldCure.DocumentParsers.Audio.Transcription;
 
 namespace FieldCure.DocumentParsers.Audio.Tests;
 
@@ -126,6 +126,43 @@ public class AudioFixtureTests
         Assert.IsTrue(
             normalizedTranscript.Any(IsKoreanSyllable),
             "Expected Hangul syllables from the LibriVox Korean fixture.");
+    }
+
+    /// <summary>
+    /// Verifies that, when the transcriber does not implement
+    /// <see cref="IModelSizeReporting"/>, the metadata header reports the
+    /// caller-supplied <c>ModelPath</c> filename (the formatter's path-wins policy).
+    /// </summary>
+    /// <remarks>
+    /// Opt-in: skipped as <c>Inconclusive</c> unless both environment variables are set.
+    /// <code>
+    /// # PowerShell
+    /// $env:FIELDCURE_AUDIO_ENABLE_WHISPER_FIXTURE_TESTS = '1'
+    /// $env:FIELDCURE_WHISPER_MODEL_PATH = "$env:LOCALAPPDATA\FieldCure\WhisperModels\ggml-base.bin"
+    /// dotnet test src/DocumentParsers.Audio.Tests --filter "TestCategory=Integration"
+    /// </code>
+    /// The <c>ggml-base.bin</c> model can be downloaded from
+    /// <c>https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin</c>.
+    /// </remarks>
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task Whisper_PublicDomainEnglishFixture_HeaderReportsModelPathFileName()
+    {
+        var modelPath = GetWhisperModelPathOrInconclusive();
+        await using var parser = new AudioDocumentParser();
+
+        var markdown = await parser.ParseAsync(
+            new MemoryStream(ReadPublicDomainFixture(EnglishFixtureFileName)),
+            new AudioExtractionOptions
+            {
+                SourceExtension = ".mp3",
+                Language = "en",
+                ModelPath = modelPath,
+                IncludeTimestamps = false,
+            });
+
+        var expectedFileName = Path.GetFileName(modelPath);
+        StringAssert.Contains(markdown, $"| Model | {expectedFileName} |");
     }
 
     /// <summary>

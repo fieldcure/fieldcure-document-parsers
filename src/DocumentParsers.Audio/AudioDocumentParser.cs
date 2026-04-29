@@ -139,7 +139,7 @@ public sealed class AudioDocumentParser : IDocumentParser, IAsyncDisposable
         var formattingOptions =
             _transcriber is IModelSizeReporting reporter
             && reporter.EffectiveModelSize is { } effectiveModelSize
-                ? options.WithModelSize(effectiveModelSize)
+                ? options.WithEffectiveModel(effectiveModelSize)
                 : options;
 
         return MarkdownFormatter.Format(segments, formattingOptions);

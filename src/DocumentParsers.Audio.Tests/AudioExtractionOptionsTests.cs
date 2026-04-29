@@ -64,6 +64,62 @@ public class AudioExtractionOptionsTests
         }
     }
 
+    /// <summary>
+    /// Regression guard: ensures that <see cref="AudioExtractionOptions.WithEffectiveModel"/>
+    /// copies every <c>init</c>-only property declared on the type and its base, while
+    /// clearing <c>ModelPath</c> (so an effective-size override wins in the formatter).
+    /// </summary>
+    [TestMethod]
+    public void WithEffectiveModel_PreservesAllInitPropertiesExceptModelPath()
+    {
+        var source = new AudioExtractionOptions
+        {
+            // Base ExtractionOptions: flip from defaults so any missed copy is detectable.
+            IncludeMetadata = false,
+            IncludeHeaders = false,
+            IncludeFooters = false,
+            IncludeFootnotes = false,
+            IncludeEndnotes = false,
+            IncludeComments = false,
+            SourceExtension = ".audio-test",
+
+            // AudioExtractionOptions own properties: distinct non-default values.
+            Language = "ko",
+            ModelSize = WhisperModelSize.Small,
+            ModelPath = "/tmp/custom-model.bin",
+            TranslateToEnglish = true,
+            RuntimeLibraryOrder = new[] { RuntimeLibrary.Cpu },
+            IncludeConfidence = true,
+            IncludeTimestamps = false,
+        };
+
+        var copy = source.WithEffectiveModel(WhisperModelSize.Large);
+
+        Assert.AreEqual(WhisperModelSize.Large, copy.ModelSize, "ModelSize must reflect override.");
+        Assert.IsNull(copy.ModelPath, "ModelPath must be cleared so the effective size wins in formatting.");
+
+        // Reflectively verify every init-only property other than ModelSize and ModelPath is preserved.
+        var initProps = typeof(AudioExtractionOptions)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanWrite && IsInitOnly(p)
+                && p.Name != nameof(AudioExtractionOptions.ModelSize)
+                && p.Name != nameof(AudioExtractionOptions.ModelPath))
+            .ToList();
+
+        Assert.IsTrue(initProps.Count >= 12,
+            $"Expected at least 12 init-only properties to verify; found {initProps.Count}. " +
+            "If this fails, the reflection filter is wrong or properties were removed.");
+
+        foreach (var prop in initProps)
+        {
+            var expected = prop.GetValue(source);
+            var actual = prop.GetValue(copy);
+            Assert.AreEqual(expected, actual,
+                $"WithEffectiveModel dropped property '{prop.Name}'. " +
+                "Append it to the explicit copy in AudioExtractionOptions.WithEffectiveModel.");
+        }
+    }
+
     private static bool IsInitOnly(PropertyInfo prop)
     {
         // init-only setters are encoded as a setter with an IsExternalInit modreq.

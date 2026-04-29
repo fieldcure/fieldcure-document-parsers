@@ -94,4 +94,42 @@ public class AudioExtractionOptions : ExtractionOptions
             IncludeTimestamps = IncludeTimestamps,
             ProgressCallback = ProgressCallback,
         };
+
+    /// <summary>
+    /// Returns a copy of these options with <see cref="ModelSize"/> overridden and
+    /// <see cref="ModelPath"/> cleared, so transcript metadata reflects the effective
+    /// model reported by an <see cref="Transcription.IModelSizeReporting"/> transcriber
+    /// rather than the caller-supplied path.
+    /// </summary>
+    /// <remarks>
+    /// MAINTENANCE: like <see cref="WithModelSize"/>, this method explicitly copies every
+    /// <c>init</c>-only property declared on this type and its base. When a new <c>init</c>
+    /// property is added, it MUST be appended here. The
+    /// <c>WithEffectiveModel_PreservesAllInitPropertiesExceptModelPath</c> regression test
+    /// enforces this via reflection.
+    /// </remarks>
+    /// <param name="modelSize">Effective model size to record.</param>
+    /// <returns>Copy with <c>ModelSize</c> overridden and <c>ModelPath</c> cleared.</returns>
+    public AudioExtractionOptions WithEffectiveModel(WhisperModelSize modelSize) =>
+        new()
+        {
+            // Base ExtractionOptions properties
+            IncludeMetadata = IncludeMetadata,
+            IncludeHeaders = IncludeHeaders,
+            IncludeFooters = IncludeFooters,
+            IncludeFootnotes = IncludeFootnotes,
+            IncludeEndnotes = IncludeEndnotes,
+            IncludeComments = IncludeComments,
+            SourceExtension = SourceExtension,
+
+            // AudioExtractionOptions own properties
+            Language = Language,
+            ModelSize = modelSize, // overridden
+            ModelPath = null,      // cleared so the effective size wins in formatting
+            TranslateToEnglish = TranslateToEnglish,
+            RuntimeLibraryOrder = RuntimeLibraryOrder,
+            IncludeConfidence = IncludeConfidence,
+            IncludeTimestamps = IncludeTimestamps,
+            ProgressCallback = ProgressCallback,
+        };
 }
