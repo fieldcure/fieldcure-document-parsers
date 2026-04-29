@@ -1,5 +1,73 @@
 ﻿# FieldCure.DocumentParsers.Audio Release Notes
 
+## v0.4.0 - 2026-04-29
+
+### Added
+
+- **`IModelSizeReporting` capability interface.** New optional interface in
+  `FieldCure.DocumentParsers.Audio.Transcription`. An `IAudioTranscriber`
+  implementation that internally overrides the model the caller requested
+  (for example a lazy/wrapping transcriber that maps `WhisperModelSize.Base`
+  to a Large model based on host capability) can additionally implement
+  `IModelSizeReporting` and expose `EffectiveModelSize` so the rendered
+  transcript header reflects what was actually used:
+
+  ```csharp
+  public sealed class LazyAudioTranscriber : IAudioTranscriber, IModelSizeReporting
+  {
+      public WhisperModelSize? EffectiveModelSize => _resolvedSize;
+      // ...
+  }
+  ```
+
+  When the parser sees a reporter, it rewrites the formatting options via
+  `WithEffectiveModel(...)` (see below) before handing them to
+  `MarkdownFormatter`, so the metadata block reads
+  `| Model | large |` instead of `| Model | base |` /
+  `| Model | ggml-base.bin |`.
+
+- **`AudioExtractionOptions.WithEffectiveModel(WhisperModelSize)`.**
+  Sibling of the existing `WithModelSize`. In addition to overriding
+  `ModelSize`, it clears `ModelPath` so the formatter's path-wins policy
+  cannot mask a transcriber-side override. Provided as a stable extension
+  point for callers building options manually.
+
+### Changed
+
+- `AudioDocumentParser.ExtractText` now post-processes its formatting
+  options through pattern-matching against `IModelSizeReporting`. The
+  hot path (transcribers that do not implement the interface) is a single
+  pattern test and continues to use the caller's options unchanged.
+
+### Why
+
+Downstream consumers (notably `LazyAudioTranscriber` in
+`fieldcure-mcp-rag`) override the Whisper model internally based on host
+GPU capability, but the rendered transcript header was reporting the
+caller-requested model — making it impossible to tell from the output
+which model was actually run. v0.4 surfaces the effective model at the
+metadata layer through a typed, opt-in capability rather than reflection
+or undocumented side channels.
+
+### Migration
+
+- **Purely additive.** Existing `IAudioTranscriber` implementations and
+  existing `AudioExtractionOptions` callers are unaffected. The new
+  interface is opt-in: implement it only when you want the effective
+  model reflected in the header.
+- The built-in `WhisperTranscriber` does **not** yet implement
+  `IModelSizeReporting`. Behavior for callers using `WhisperTranscriber`
+  directly is byte-identical to v0.3.1.
+
+### Coverage
+
+- `AudioDocumentParserTests.ExtractText_WhenTranscriberReportsModelSize_UsesReportedModelInMetadata`
+- `AudioDocumentParserTests.ExtractText_WhenTranscriberReportsModelSize_OverridesCallerModelPathInMetadata`
+- `AudioDocumentParserTests.ExtractText_WhenTranscriberDoesNotReportModelSize_UsesOptionsModelInMetadata`
+- `AudioExtractionOptionsTests.WithEffectiveModel_PreservesAllInitPropertiesExceptModelPath`
+- `AudioFixtureTests.Whisper_PublicDomainEnglishFixture_HeaderReportsModelPathFileName`
+  (opt-in integration; pins the path-wins policy when no reporter is present)
+
 ## v0.3.1 - 2026-04-28
 
 ### Fixed

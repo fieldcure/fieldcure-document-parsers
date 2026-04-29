@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>0.3.1</Version>
+    <Version>0.4.0</Version>
     <AssemblyName>FieldCure.DocumentParsers.Audio</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Audio</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -23,7 +23,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v0.3.1 - Hotfix for WAVE_FORMAT_EXTENSIBLE PCM input. AudioConverter previously threw ArgumentException("Input must be PCM or IEEE float") on multi-channel WAVs whose fmt chunk uses formatTag 0xFFFE (the standard format for Windows capture pipelines and most modern DAWs), even when the underlying SubFormat was KSDATAFORMAT_SUBTYPE_PCM with byte-identical PCM samples. Fix: detect the extensible format tag, inspect the SubFormat GUID, and re-label the WaveFormat as standard PCM or IEEE float without converting any bytes. Multi-channel inputs now flow through to MediaFoundationResampler unchanged. Unknown SubFormats raise NotSupportedException with a clear message rather than the misleading downstream resampler error.
+      v0.4.0 - Transcript metadata now reflects the model the transcriber actually used, not the model the caller asked for. Adds IModelSizeReporting, an opt-in capability interface that an IAudioTranscriber implementation (e.g. a lazy/wrapping transcriber that overrides the model internally) can implement to report its EffectiveModelSize. When present, AudioDocumentParser overrides both ModelSize and ModelPath in the formatting options so the rendered "| Model |" header reflects the effective model rather than the caller-supplied path. Also adds AudioExtractionOptions.WithEffectiveModel for callers building options manually. Existing transcribers and callers are unaffected; this is a purely additive change.
     </PackageReleaseNotes>
   </PropertyGroup>
 
