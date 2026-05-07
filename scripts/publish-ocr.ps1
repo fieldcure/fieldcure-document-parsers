@@ -17,6 +17,18 @@ param(
 
 . "$PSScriptRoot\nuget-common.ps1"
 
+# When publishing a prerelease via -PackageVersion, MSBuild's /p:PackageVersion
+# override propagates to OCR's transitive ProjectReference on Imaging — making
+# the resulting nuspec say Imaging dep = "<same prerelease>", which doesn't
+# exist on nuget.org. Pin the dep back to the published Imaging version so the
+# prerelease nupkg's dep chain resolves cleanly on consumer restore.
+$depOverrides = @{}
+if ($PackageVersion) {
+    $depOverrides = @{
+        'FieldCure.DocumentParsers.Imaging' = '1.0.0'
+    }
+}
+
 Invoke-NuGetPublish `
     -Projects @(
         'src\DocumentParsers.Ocr\DocumentParsers.Ocr.csproj'
@@ -24,4 +36,5 @@ Invoke-NuGetPublish `
     -SkipSign:$SkipSign `
     -SkipPush:$SkipPush `
     -NuGetApiKey $NuGetApiKey `
-    -PackageVersion $PackageVersion
+    -PackageVersion $PackageVersion `
+    -DependencyOverrides $depOverrides

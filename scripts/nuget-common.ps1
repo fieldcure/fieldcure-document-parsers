@@ -17,17 +17,82 @@ $script:CertFingerprint = 'FB343073EF0D477E64595A66FFB87AC631278C4B43D2CC89C56BC
 $script:TimestampUrl = 'http://timestamp.globalsign.com/tsa/r6advanced1'
 $script:NuGetSource = 'https://api.nuget.org/v3/index.json'
 
+function Set-NupkgDependencyVersion {
+    <#
+    .SYNOPSIS
+        Rewrites a single <dependency id="X" version="..."/> entry inside a
+        nupkg's top-level .nuspec, in place.
+    .DESCRIPTION
+        Workaround for an MSBuild quirk: a /p:PackageVersion override at
+        `dotnet pack` time propagates to every project in the build, including
+        transitive ProjectReferences. So when we pack OCR with /p:PackageVersion
+        =1.2.0-preview.X to publish a prerelease, the resulting OCR.nuspec
+        records the Imaging dep as "1.2.0-preview.X" too — even though we have
+        no intention of publishing Imaging at that version. This helper lets a
+        publish script pin the dep back to whatever is actually published on
+        nuget.org. Must be called BEFORE Authenticode signing; signing covers
+        the modified nuspec and consumers validate against the post-edit content.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$NupkgPath,
+        [Parameter(Mandatory)][string]$DependencyId,
+        [Parameter(Mandatory)][string]$NewVersion
+    )
+
+    Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+    $archive = [System.IO.Compression.ZipFile]::Open($NupkgPath, [System.IO.Compression.ZipArchiveMode]::Update)
+    try {
+        $nuspecEntry = $archive.Entries |
+            Where-Object { $_.FullName -like '*.nuspec' -and -not $_.FullName.Contains('/') } |
+            Select-Object -First 1
+        if (-not $nuspecEntry) {
+            throw "No top-level .nuspec found in $NupkgPath"
+        }
+
+        $entryStream = $nuspecEntry.Open()
+        $reader = New-Object System.IO.StreamReader($entryStream, [System.Text.Encoding]::UTF8)
+        $content = $reader.ReadToEnd()
+        $reader.Close()
+        $entryStream.Close()
+
+        $idEsc = [regex]::Escape($DependencyId)
+        $pattern = "(<dependency\s+id=`"$idEsc`"[^>]*\s+version=`")[^`"]+(`")"
+        $modified = [regex]::Replace($content, $pattern, "`${1}$NewVersion`${2}")
+
+        if ($modified -eq $content) {
+            return $false  # dep not present in this nupkg — silently skip
+        }
+
+        $entryStream = $nuspecEntry.Open()
+        $entryStream.SetLength(0)
+        $writer = New-Object System.IO.StreamWriter($entryStream, [System.Text.Encoding]::UTF8)
+        $writer.Write($modified)
+        $writer.Flush()
+        $writer.Close()
+        $entryStream.Close()
+        return $true
+    } finally {
+        $archive.Dispose()
+    }
+}
+
 function Invoke-NuGetPublish {
     param(
         [string[]]$Projects,
         [switch]$SkipSign,
         [switch]$SkipPush,
         [string]$NuGetApiKey,
-        [string]$PackageVersion  # Optional override; lets the publish script
-                                 # produce a prerelease nupkg (e.g.
-                                 # 1.2.0-preview.1) without committing a csproj
-                                 # <Version> change. When non-empty, passed to
-                                 # dotnet pack as /p:PackageVersion=...
+        [string]$PackageVersion,  # Optional override; lets the publish script
+                                  # produce a prerelease nupkg (e.g.
+                                  # 1.2.0-preview.1) without committing a csproj
+                                  # <Version> change. When non-empty, passed to
+                                  # dotnet pack as /p:PackageVersion=...
+        [hashtable]$DependencyOverrides = @{}  # Optional; { 'PackageId' = 'X.Y.Z' }
+                                               # entries are applied in-place to
+                                               # each packed nuspec before signing.
+                                               # See Set-NupkgDependencyVersion.
     )
 
     $OutputDir = Join-Path $script:RepoRoot 'artifacts'
@@ -59,6 +124,21 @@ function Invoke-NuGetPublish {
     $packages = Get-ChildItem $OutputDir -Filter '*.nupkg'
     Write-Host "`n  Packages created:" -ForegroundColor Green
     $packages | ForEach-Object { Write-Host "    $_" }
+
+    # --- 1b. Patch dependency versions (must run BEFORE signing) ---
+    if ($DependencyOverrides.Count -gt 0) {
+        Write-Host "`n=== Patching nuspec dependencies ===" -ForegroundColor Cyan
+        foreach ($pkg in $packages) {
+            foreach ($depId in $DependencyOverrides.Keys) {
+                $newVer = $DependencyOverrides[$depId]
+                $patched = Set-NupkgDependencyVersion -NupkgPath $pkg.FullName `
+                    -DependencyId $depId -NewVersion $newVer
+                if ($patched) {
+                    Write-Host "  $($pkg.Name): $depId -> $newVer"
+                }
+            }
+        }
+    }
 
     # --- 2. Sign ---
     if (-not $SkipSign) {
