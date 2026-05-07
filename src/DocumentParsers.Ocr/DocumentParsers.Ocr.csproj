@@ -60,16 +60,18 @@
 
   <!--
     ============================================================================
-    Native DLL packaging strategy — why "x64/" + build/*.targets, not runtimes/
+    Native DLL packaging strategy — why "x64/" + "arm64/" + build/*.targets,
+    not runtimes/<rid>/native/
     ============================================================================
-    This package ships Tesseract's native DLLs at "x64/" (package root) and
-    copies them to the consumer's output via build/*.targets. We intentionally
+    This package ships Tesseract's native DLLs at "x64/" and "arm64/" (package
+    root), copied to the consumer's output by build/*.targets. We intentionally
     do NOT use the modern "runtimes/win-x64/native/" NuGet convention.
 
     Rationale:
-      - Normal library consumers already get these DLLs transitively from the
-        Tesseract package itself — so this redistribution is redundant for them
-        (harmless, NuGet overwrites with identical bytes).
+      - Normal library consumers (x64) already get the x64 DLLs transitively
+        from the Tesseract package itself — so the x64 redistribution is
+        redundant for them (harmless, NuGet overwrites with identical bytes).
+        win-arm64 has no upstream binary; we are the source.
       - PackAsTool consumers (MCP servers, dotnet global tools) are the real
         target. PackAsTool does NOT propagate native transitive dependencies,
         and it ignores runtimes/<rid>/native/. Tool packages require the
@@ -78,22 +80,37 @@
       - Switching to runtimes/win-x64/native/ would re-introduce the
         DllNotFoundException that v1.0.1 of the predecessor package
         (FieldCure.DocumentParsers.Pdf.Ocr) was released to fix.
+      - The Tesseract.NET wrapper's SystemManager.GetPlatformName() returns
+        "x64" for any 64-bit process (no arch detection), so its DLL lookup
+        is hard-coded at <baseDir>\x64\tesseract50.dll on both win-x64 and
+        win-arm64. build/*.targets selects the correct-arch DLL based on
+        $(Platform) / $(RuntimeIdentifier) and lands it at the consumer's
+        output x64\ folder.
       - NU5100 warnings from pack ("x64\*.dll is outside lib/") are expected
         and suppressed by convention — the DLLs are deliberately not managed
         references.
 
+    ARM64 binaries:
+      Built from Tesseract 5.5.2 + Leptonica 1.87.0 source via vcpkg with a
+      slim overlay-port (scripts/vcpkg-overlay/) that disables the libcurl +
+      libarchive integration. Checked-in at native/win-arm64/, signed with
+      the Fieldcure EV cert. Reproduce via scripts/build-tesseract-arm64.ps1.
+      C ABI 5.0 -> 5.5 is additive only, so the wrapper is compatible.
+
     Future cross-platform OCR:
       Add runtimes/linux-x64/native/ and runtimes/osx-x64/native/ ALONGSIDE
-      (not replacing) the current x64/ + targets structure. The two layouts
-      coexist: normal consumers resolve via runtimes/, PackAsTool consumers
-      still need the .targets-driven tools/<tfm>/<arch>/ copy.
+      (not replacing) the current x64/ + arm64/ + targets structure. The two
+      layouts coexist: normal cross-platform consumers resolve via runtimes/,
+      PackAsTool consumers still need the .targets-driven tools/<tfm>/<arch>/
+      copy.
 
     Maintenance:
       When upgrading Tesseract, update the version and filenames BOTH here AND
-      in build/*.targets (e.g., tesseract50.dll -> tesseract53.dll; leptonica
-      version may also change). Paths resolve via $(NuGetPackageRoot) because
-      GeneratePathProperty="true" is unreliable in multi-TFM pack scenarios
-      (the $(PkgTesseract) property evaluates empty during pack aggregation).
+      in build/*.targets AND the overlay-port (scripts/vcpkg-overlay/ports/
+      tesseract/) for ARM64 rebuild. The x64 path resolves via
+      $(NuGetPackageRoot) because GeneratePathProperty="true" is unreliable in
+      multi-TFM pack scenarios (the $(PkgTesseract) property evaluates empty
+      during pack aggregation).
     ============================================================================
   -->
   <ItemGroup>
@@ -101,6 +118,11 @@
           Pack="true" PackagePath="x64/" Visible="false" />
     <None Include="$(NuGetPackageRoot)tesseract\5.2.0\x64\tesseract50.dll"
           Pack="true" PackagePath="x64/" Visible="false" />
+
+    <None Include="native\win-arm64\leptonica-1.87.0.dll"
+          Pack="true" PackagePath="arm64/" Visible="false" />
+    <None Include="native\win-arm64\tesseract50.dll"
+          Pack="true" PackagePath="arm64/" Visible="false" />
 
     <!-- .targets for both direct and transitive consumers -->
     <None Include="build\FieldCure.DocumentParsers.Ocr.targets"

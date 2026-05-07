@@ -1,15 +1,28 @@
 <Project>
   <!-- Tesseract native DLLs — filenames are version-specific.
        When upgrading Tesseract, update both this file AND the csproj <ItemGroup>
-       (e.g., tesseract50.dll → tesseract53.dll, leptonica version may also change).
+       (e.g., tesseract50.dll -> tesseract53.dll, leptonica version may also change).
 
        See DocumentParsers.Ocr.csproj for the full rationale on why this uses
        "x64/" + targets instead of the runtimes/<rid>/native/ convention.
        TL;DR: PackAsTool consumers need the tools/<tfm>/<arch>/ layout, which
-       runtimes/ does not provide. -->
+       runtimes/ does not provide.
 
-  <!-- Build time: copy native DLLs to output x64/ -->
-  <ItemGroup>
+       Why the output Link is always "x64\..." even on ARM64:
+       The wrapper's SystemManager.GetPlatformName() (charlesw/tesseract) returns
+       "x64" for any 64-bit process — IntPtr.Size only, no arch detection. So
+       the wrapper looks for natives at <baseDir>\x64\tesseract50.dll on both
+       win-x64 and win-arm64. The "x64\" output folder name is wrapper-driven,
+       not arch-driven; we land the right-arch binaries there based on
+       $(Platform) / $(RuntimeIdentifier). -->
+
+  <PropertyGroup>
+    <_FieldCureOcrIsArm64>false</_FieldCureOcrIsArm64>
+    <_FieldCureOcrIsArm64 Condition="'$(RuntimeIdentifier)' == 'win-arm64' Or '$(Platform)' == 'ARM64' Or '$(PlatformTarget)' == 'ARM64'">true</_FieldCureOcrIsArm64>
+  </PropertyGroup>
+
+  <!-- Build time: copy x64 native DLLs to output x64/ -->
+  <ItemGroup Condition="'$(_FieldCureOcrIsArm64)' != 'true'">
     <None Include="$(MSBuildThisFileDirectory)..\x64\leptonica-1.82.0.dll"
           CopyToOutputDirectory="PreserveNewest"
           Link="x64\leptonica-1.82.0.dll" />
@@ -18,12 +31,33 @@
           Link="x64\tesseract50.dll" />
   </ItemGroup>
 
-  <!-- PackAsTool: include native DLLs in tool package -->
-  <ItemGroup Condition="'$(PackAsTool)' == 'true'">
+  <!-- Build time: copy ARM64 native DLLs to output x64/ (wrapper-expected folder) -->
+  <ItemGroup Condition="'$(_FieldCureOcrIsArm64)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)..\arm64\leptonica-1.87.0.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="x64\leptonica-1.87.0.dll" />
+    <None Include="$(MSBuildThisFileDirectory)..\arm64\tesseract50.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="x64\tesseract50.dll" />
+  </ItemGroup>
+
+  <!-- PackAsTool: include x64 native DLLs in tool package -->
+  <ItemGroup Condition="'$(PackAsTool)' == 'true' And '$(_FieldCureOcrIsArm64)' != 'true'">
     <None Update="$(MSBuildThisFileDirectory)..\x64\leptonica-1.82.0.dll"
           Pack="true"
           PackagePath="tools/$(TargetFramework)/any/x64/" />
     <None Update="$(MSBuildThisFileDirectory)..\x64\tesseract50.dll"
+          Pack="true"
+          PackagePath="tools/$(TargetFramework)/any/x64/" />
+  </ItemGroup>
+
+  <!-- PackAsTool: include ARM64 native DLLs in tool package (still under tools/<tfm>/any/x64/
+       because the wrapper's lookup is hard-coded to "x64\" — see comment above) -->
+  <ItemGroup Condition="'$(PackAsTool)' == 'true' And '$(_FieldCureOcrIsArm64)' == 'true'">
+    <None Update="$(MSBuildThisFileDirectory)..\arm64\leptonica-1.87.0.dll"
+          Pack="true"
+          PackagePath="tools/$(TargetFramework)/any/x64/" />
+    <None Update="$(MSBuildThisFileDirectory)..\arm64\tesseract50.dll"
           Pack="true"
           PackagePath="tools/$(TargetFramework)/any/x64/" />
   </ItemGroup>
