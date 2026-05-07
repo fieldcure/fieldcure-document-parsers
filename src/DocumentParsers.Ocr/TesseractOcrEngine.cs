@@ -33,6 +33,10 @@ public sealed partial class TesseractOcrEngine : IOcrEngine, IDisposable
     /// </param>
     public TesseractOcrEngine(int? maxPoolSize = null)
     {
+        // Route the wrapper's hard-coded x64\ DLL lookup at this process's
+        // architecture before the first TessBaseAPI call below. Idempotent.
+        NativeLibraryBootstrap.EnsureInitialized();
+
         var poolSize = maxPoolSize ?? Math.Min(Environment.ProcessorCount, 4);
 
         _tessdataPath = ExtractEmbeddedTessdata();
