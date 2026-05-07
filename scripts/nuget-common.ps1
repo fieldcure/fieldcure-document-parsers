@@ -22,7 +22,12 @@ function Invoke-NuGetPublish {
         [string[]]$Projects,
         [switch]$SkipSign,
         [switch]$SkipPush,
-        [string]$NuGetApiKey
+        [string]$NuGetApiKey,
+        [string]$PackageVersion  # Optional override; lets the publish script
+                                 # produce a prerelease nupkg (e.g.
+                                 # 1.2.0-preview.1) without committing a csproj
+                                 # <Version> change. When non-empty, passed to
+                                 # dotnet pack as /p:PackageVersion=...
     )
 
     $OutputDir = Join-Path $script:RepoRoot 'artifacts'
@@ -40,7 +45,12 @@ function Invoke-NuGetPublish {
         Write-Host "  Cleaning $proj ..."
         dotnet clean $projPath -c Release --nologo -v q
         Write-Host "  Packing $proj ..."
-        dotnet pack $projPath -c Release -o $OutputDir
+        $packArgs = @($projPath, '-c', 'Release', '-o', $OutputDir)
+        if ($PackageVersion) {
+            Write-Host "    (PackageVersion override: $PackageVersion)"
+            $packArgs += "/p:PackageVersion=$PackageVersion"
+        }
+        dotnet pack @packArgs
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Pack failed for $proj"
         }
