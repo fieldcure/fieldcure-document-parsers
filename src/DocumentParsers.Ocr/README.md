@@ -67,6 +67,17 @@ Languages are auto-discovered from embedded traineddata files.
 
 The Tesseract C ABI is additive across 5.0 -> 5.5 (no symbol removals or signature changes), so the wrapper's `[DllImport]` surface is fully compatible. `build/FieldCure.DocumentParsers.Ocr.targets` selects the correct-arch DLL at consumer build time by detecting host RID via `$(NETCoreSdkRuntimeIdentifier)`, with `$(Platform)`, `$(RuntimeIdentifier)`, `$(PlatformTarget)` as override paths for explicit-arch cross builds.
 
+### PackAsTool consumers (dnx, dotnet tool)
+
+A single tool nupkg may be fetched and run by `dnx` on either x64 or ARM64, but it's packed once on a single CI host. From v1.2.0 on, PackAsTool consumers get **both** native trees inside the tool nupkg:
+
+```
+tools/<tfm>/any/x64/                 -- x64 Tesseract + Leptonica
+tools/<tfm>/any/arm64-platform/x64/  -- ARM64 Tesseract + Leptonica
+```
+
+At runtime, `NativeLibraryBootstrap` (called from `TesseractOcrEngine`'s constructor) inspects `RuntimeInformation.ProcessArchitecture` and, on ARM64, points the wrapper's `LibraryLoader.CustomSearchPath` at the `arm64-platform/` subfolder. The wrapper's hard-coded `<base>\x64\` lookup then resolves the ARM64 binaries. The bootstrap is a silent no-op for library consumers (where the chosen-arch DLL already sits in `<base>\x64\` directly).
+
 ## Related Packages
 
 - [FieldCure.DocumentParsers](https://www.nuget.org/packages/FieldCure.DocumentParsers) — Core text extraction

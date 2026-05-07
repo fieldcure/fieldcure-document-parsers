@@ -1,5 +1,28 @@
 # Release Notes — FieldCure.DocumentParsers.Ocr
 
+## [1.2.0] - 2026-05-07
+
+### Added
+- **PackAsTool / dnx ARM64 deployment path.** `build/FieldCure.DocumentParsers.Ocr.targets` now packs BOTH architectures' native trees into PackAsTool consumers' tool nupkg:
+  - `tools/<tfm>/any/x64/` — x64 binaries (the wrapper's default lookup folder).
+  - `tools/<tfm>/any/arm64-platform/x64/` — ARM64 binaries, in the wrapper-expected `x64/` subfolder under an arch-disambiguating prefix.
+- `NativeLibraryBootstrap` runtime router. On the first `TesseractOcrEngine` construction, when the process is ARM64 and the colocated `arm64-platform/x64/` tree exists, sets `LibraryLoader.Instance.CustomSearchPath` to `<basedir>/arm64-platform/`. The Tesseract.NET wrapper's `LibraryLoader` probes `CustomSearchPath` ahead of the executing-assembly directory, so the ARM64 binary resolves first. Idempotent and silently no-op for library consumers (where the chosen-arch DLL already sits in `<base>\x64\` directly).
+
+### Why
+v1.1.0 added ARM64 binaries to the package and made library consumers' build flow ARM64-aware, but PackAsTool consumers (notably `FieldCure.Mcp.Rag` running under `dnx`) were still broken on ARM64. PackAsTool packs are produced once on a single CI host (typically x64) yet the resulting tool nupkg may be fetched and run by `dnx` on either x64 or ARM64. Pre-1.2.0 the v1.1.0 targets file landed only the pack-host arch into `tools/<tfm>/any/x64/`, so an x64-CI-packed tool would `BadImageFormatException` on first OCR call when run under ARM64 dnx. v1.2.0 carries both arches in the tool nupkg and routes the wrapper's lookup at runtime.
+
+### Compatibility notes
+- **Library consumers:** unchanged. v1.1.0's host-RID-based DLL selection still applies; the bootstrap stays no-op because `arm64-platform/x64/` doesn't exist in library deployments.
+- **PackAsTool consumers:** rebuild against 1.2.0 to pick up the multi-arch tool layout. No code change needed in consumer projects.
+- **Native binary versions** unchanged from 1.1.0 — same vcpkg-built Tesseract 5.5.2 + Leptonica 1.87.0 (renamed to `leptonica-1.82.0.dll` for wrapper compat) on ARM64, same upstream Tesseract NuGet 5.2.0 redistribution on x64.
+- The `Tesseract.NET` wrapper used (`charlesw/tesseract`) hard-codes its DLL search at `<baseDir>\x64\tesseract50.dll`. The `arm64-platform/` folder name + `LibraryLoader.CustomSearchPath` hack is a workaround for that hard-coding; switching to a fork that exposes per-arch lookup (e.g., `Sicos1977/TesseractOCR`, tracked separately) would let us drop the bootstrap.
+
+### Validation
+Cross-arch GHA workflow `arm64-dnx-smoke.yml` in `fieldcure/fieldcure-mcp-rag` (manual `workflow_dispatch`): `windows-latest` packs MCP RAG with this OCR version pinned, `windows-11-arm` installs the resulting tool from the local feed and runs `fieldcure-mcp-rag smoke-ocr --pdf <scanned-english-fixture>`. End-to-end pass requires both the multi-arch pack and the runtime router to work; observed `[smoke-ocr] arch=Arm64 ... OK: 2545 chars extracted`.
+
+### Migration
+None required.
+
 ## [1.1.0] - 2026-05-07
 
 ### Added

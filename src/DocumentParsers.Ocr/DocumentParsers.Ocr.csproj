@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <AssemblyName>FieldCure.DocumentParsers.Ocr</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Ocr</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -28,7 +28,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v1.1.0 — Adds win-arm64 native binaries. ARM64 DLLs (tesseract50.dll, leptonica-1.82.0.dll) are built from Tesseract 5.5.2 + Leptonica 1.87.0 source via vcpkg with a slim overlay-port (libcurl + libarchive disabled), Authenticode-signed by Fieldcure Co., Ltd., and selected at build time by detecting host RID via $(NETCoreSdkRuntimeIdentifier) (with $(Platform)/$(RuntimeIdentifier)/$(PlatformTarget) override paths for explicit arch builds). The wrapper hardcodes "leptonica-1.82.0" + "tesseract50" filenames, so the ARM64 leptonica file is renamed to leptonica-1.82.0.dll and tesseract50.dll's PE import table is patched in-place to reference that name. The x64 path is unchanged (Tesseract 5.0 native, redistributed from upstream Tesseract NuGet 5.2.0). The Tesseract C ABI is additive across 5.0 -> 5.5, so the wrapper's DllImport surface is fully compatible. Build script: scripts/build-tesseract-arm64.ps1. CI verified on windows-11-arm runner.
+      v1.2.0 — Closes the PackAsTool / dnx ARM64 path. v1.1.0 added ARM64 binaries to the package but build/*.targets selected only one arch into PackAsTool consumers' tool nupkg (the pack-host arch), so an x64-CI-packed dotnet tool BadImageFormatException'd on ARM64 dnx. v1.2.0 packs BOTH x64 and ARM64 native trees into PackAsTool consumers (tools/&lt;tfm&gt;/any/x64/ + tools/&lt;tfm&gt;/any/arm64-platform/x64/). New NativeLibraryBootstrap routes the Tesseract.NET wrapper's hard-coded x64\ DLL lookup to the ARM64 tree at runtime via LibraryLoader.CustomSearchPath when the process is ARM64. Library consumers are unchanged; the bootstrap is a silent no-op for non-PackAsTool deployments. Validated via cross-arch GHA workflow (windows-latest pack -&gt; windows-11-arm install + invoke) — scanned English PDF returns 2500+ chars of recognized text on first ARM64 dnx invocation.
     </PackageReleaseNotes>
   </PropertyGroup>
 
