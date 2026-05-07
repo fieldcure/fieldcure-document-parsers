@@ -14,10 +14,8 @@ jobs:
         include:
           - os: windows-latest
             arch: x64
-            extra-args: ""
           - os: windows-11-arm
             arch: arm64
-            extra-args: "/p:Platform=ARM64"
     runs-on: ${{ matrix.os }}
     name: build-${{ matrix.arch }}
 
@@ -35,7 +33,7 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --no-restore -c Release ${{ matrix.extra-args }}
+        run: dotnet build --no-restore -c Release
 
       - name: Test
-        run: dotnet test --no-build -c Release ${{ matrix.extra-args }}
+        run: dotnet test --no-build -c Release

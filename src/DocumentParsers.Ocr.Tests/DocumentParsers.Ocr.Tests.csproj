@@ -43,7 +43,7 @@
        Tesseract natives at the wrapper-expected x64\ output folder. -->
   <PropertyGroup>
     <_FieldCureOcrIsArm64>false</_FieldCureOcrIsArm64>
-    <_FieldCureOcrIsArm64 Condition="'$(RuntimeIdentifier)' == 'win-arm64' Or '$(Platform)' == 'ARM64' Or '$(PlatformTarget)' == 'ARM64'">true</_FieldCureOcrIsArm64>
+    <_FieldCureOcrIsArm64 Condition="'$(RuntimeIdentifier)' == 'win-arm64' Or '$(Platform)' == 'ARM64' Or '$(PlatformTarget)' == 'ARM64' Or '$(NETCoreSdkRuntimeIdentifier)' == 'win-arm64'">true</_FieldCureOcrIsArm64>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(_FieldCureOcrIsArm64)' == 'true'">
