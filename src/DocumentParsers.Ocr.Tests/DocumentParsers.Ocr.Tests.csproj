@@ -47,9 +47,9 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(_FieldCureOcrIsArm64)' == 'true'">
-    <None Include="..\DocumentParsers.Ocr\native\win-arm64\leptonica-1.87.0.dll"
+    <None Include="..\DocumentParsers.Ocr\native\win-arm64\leptonica-1.82.0.dll"
           CopyToOutputDirectory="PreserveNewest"
-          Link="x64\leptonica-1.87.0.dll" />
+          Link="x64\leptonica-1.82.0.dll" />
     <None Include="..\DocumentParsers.Ocr\native\win-arm64\tesseract50.dll"
           CopyToOutputDirectory="PreserveNewest"
           Link="x64\tesseract50.dll" />

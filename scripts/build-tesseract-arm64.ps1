@@ -17,9 +17,20 @@
     x64 NuGet build, but for arm64-windows.
 
     The output DLLs are staged at src/DocumentParsers.Ocr/native/win-arm64/
-    with these target filenames (the .NET wrapper expects "tesseract50"):
-      - tesseract50.dll    (renamed from tesseract55.dll)
-      - leptonica-1.87.0.dll  (kept as-is; tesseract50.dll imports this name)
+    with these target filenames (the .NET wrapper hardcodes both DLL names
+    in Tesseract.Interop.Constants):
+      - tesseract50.dll       (renamed from tesseract55.dll)
+      - leptonica-1.82.0.dll  (renamed from leptonica-1.87.0.dll, AND tesseract50.dll's
+                               import table is patched to reference this name)
+
+    Why the leptonica rename + PE patch: charlesw/tesseract pre-loads
+    "leptonica-1.82.0" by exact filename via LibraryLoader.Instance.LoadLibrary
+    before loading tesseract50.dll. If our DLL is named leptonica-1.87.0.dll
+    the preload fails with DllNotFoundException. Renaming the file is not
+    enough on its own — tesseract55.dll's PE import table also references
+    "leptonica-1.87.0.dll" by name, so we patch the import string in-place
+    (same byte length: 21 bytes including the trailing null). Authenticode
+    re-signing happens after the patch.
 
     Native version mismatch with x64 (5.0 vs 5.5) is intentional and harmless:
     Tesseract C API in 5.x adds symbols only — no removals or signature
@@ -54,6 +65,40 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Replace an ASCII byte sequence in a binary file in-place. Both strings
+# must be the same length; the function asserts at least one occurrence.
+# Used to retarget tesseract50.dll's leptonica import name from the vcpkg
+# build's "leptonica-1.87.0.dll" to the wrapper-expected "leptonica-1.82.0.dll".
+function Edit-AsciiBytesInFile {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Old,
+        [Parameter(Mandatory)][string]$New
+    )
+    if ($Old.Length -ne $New.Length) {
+        throw "Edit-AsciiBytesInFile: replacement length differs ($($Old.Length) vs $($New.Length)). PE import names must be patched in-place to keep section offsets stable."
+    }
+    $oldBytes = [System.Text.Encoding]::ASCII.GetBytes($Old)
+    $newBytes = [System.Text.Encoding]::ASCII.GetBytes($New)
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $count = 0
+    for ($i = 0; $i -le $bytes.Length - $oldBytes.Length; $i++) {
+        $match = $true
+        for ($j = 0; $j -lt $oldBytes.Length; $j++) {
+            if ($bytes[$i + $j] -ne $oldBytes[$j]) { $match = $false; break }
+        }
+        if ($match) {
+            for ($j = 0; $j -lt $newBytes.Length; $j++) { $bytes[$i + $j] = $newBytes[$j] }
+            $count++
+        }
+    }
+    if ($count -eq 0) {
+        throw "Edit-AsciiBytesInFile: pattern '$Old' not found in $Path"
+    }
+    [System.IO.File]::WriteAllBytes($Path, $bytes)
+    return $count
+}
+
 $repoRoot       = Resolve-Path (Join-Path $PSScriptRoot '..')
 $overlayPorts   = Join-Path $repoRoot 'scripts\vcpkg-overlay\ports'
 $overlayTriplets = Join-Path $repoRoot 'scripts\vcpkg-overlay\triplets'
@@ -76,32 +121,39 @@ foreach ($p in @($tessSrc, $leptSrc)) {
     if (-not (Test-Path $p)) { throw "Expected vcpkg output not found: $p" }
 }
 
-Write-Host "[2/4] Staging DLLs to $stageDir..." -ForegroundColor Cyan
-New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
-Copy-Item $tessSrc (Join-Path $stageDir 'tesseract50.dll') -Force
-Copy-Item $leptSrc (Join-Path $stageDir 'leptonica-1.87.0.dll') -Force
+$stagedTess = Join-Path $stageDir 'tesseract50.dll'
+$stagedLept = Join-Path $stageDir 'leptonica-1.82.0.dll'
 
-Write-Host "[3/4] Verifying renamed DLL imports..." -ForegroundColor Cyan
+Write-Host "[2/5] Staging DLLs to $stageDir..." -ForegroundColor Cyan
+New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+Copy-Item $tessSrc $stagedTess -Force
+Copy-Item $leptSrc $stagedLept -Force
+
+Write-Host "[3/5] Patching tesseract50.dll PE import: leptonica-1.87.0.dll -> leptonica-1.82.0.dll..." -ForegroundColor Cyan
+$replaced = Edit-AsciiBytesInFile -Path $stagedTess -Old 'leptonica-1.87.0.dll' -New 'leptonica-1.82.0.dll'
+Write-Host "  Patched $replaced occurrence(s)." -ForegroundColor Green
+
+Write-Host "[4/5] Verifying patched DLL imports..." -ForegroundColor Cyan
 $dumpbin = Get-ChildItem -Path "C:\Program Files\Microsoft Visual Studio\2022" -Filter dumpbin.exe -Recurse -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -like '*Hostx64\x64\dumpbin.exe' } | Select-Object -First 1
 if ($dumpbin) {
-    $deps = & $dumpbin.FullName /dependents (Join-Path $stageDir 'tesseract50.dll') 2>&1
-    $expected = ($deps -join "`n") -match 'leptonica-1\.87\.0\.dll'
-    if (-not $expected) { throw 'tesseract50.dll does not import leptonica-1.87.0.dll — staging is broken.' }
-    Write-Host '  tesseract50.dll -> leptonica-1.87.0.dll import: OK' -ForegroundColor Green
+    $deps = & $dumpbin.FullName /dependents $stagedTess 2>&1
+    $depsText = $deps -join "`n"
+    if ($depsText -match 'leptonica-1\.87\.0\.dll') { throw 'tesseract50.dll still imports leptonica-1.87.0.dll after patch.' }
+    if ($depsText -notmatch 'leptonica-1\.82\.0\.dll') { throw 'tesseract50.dll does not import leptonica-1.82.0.dll after patch.' }
+    Write-Host '  tesseract50.dll -> leptonica-1.82.0.dll import: OK' -ForegroundColor Green
 } else {
     Write-Warning 'dumpbin.exe not found; skipping import verification.'
 }
 
 if ($SkipSign) {
-    Write-Host "[4/4] -SkipSign set; leaving DLLs unsigned." -ForegroundColor Yellow
+    Write-Host "[5/5] -SkipSign set; leaving DLLs unsigned." -ForegroundColor Yellow
 } else {
-    Write-Host "[4/4] Signing staged DLLs (Authenticode, EV cert)..." -ForegroundColor Cyan
+    Write-Host "[5/5] Signing staged DLLs (Authenticode, EV cert)..." -ForegroundColor Cyan
     $signtool = Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -like '*\x64\signtool.exe' } | Sort-Object FullName -Descending | Select-Object -First 1
     if (-not $signtool) { throw 'signtool.exe not found. Install Windows 10 SDK or pass -SkipSign.' }
-    & $signtool.FullName sign /n 'Fieldcure Co., Ltd.' /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
-        (Join-Path $stageDir 'tesseract50.dll') (Join-Path $stageDir 'leptonica-1.87.0.dll')
+    & $signtool.FullName sign /n 'Fieldcure Co., Ltd.' /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $stagedTess $stagedLept
     if ($LASTEXITCODE -ne 0) { throw "signtool failed (exit $LASTEXITCODE). Ensure GlobalSign EV USB dongle is connected." }
     Write-Host '  Signed.' -ForegroundColor Green
 }

@@ -33,9 +33,9 @@
 
   <!-- Build time: copy ARM64 native DLLs to output x64/ (wrapper-expected folder) -->
   <ItemGroup Condition="'$(_FieldCureOcrIsArm64)' == 'true'">
-    <None Include="$(MSBuildThisFileDirectory)..\arm64\leptonica-1.87.0.dll"
+    <None Include="$(MSBuildThisFileDirectory)..\arm64\leptonica-1.82.0.dll"
           CopyToOutputDirectory="PreserveNewest"
-          Link="x64\leptonica-1.87.0.dll" />
+          Link="x64\leptonica-1.82.0.dll" />
     <None Include="$(MSBuildThisFileDirectory)..\arm64\tesseract50.dll"
           CopyToOutputDirectory="PreserveNewest"
           Link="x64\tesseract50.dll" />
@@ -54,7 +54,7 @@
   <!-- PackAsTool: include ARM64 native DLLs in tool package (still under tools/<tfm>/any/x64/
        because the wrapper's lookup is hard-coded to "x64\" — see comment above) -->
   <ItemGroup Condition="'$(PackAsTool)' == 'true' And '$(_FieldCureOcrIsArm64)' == 'true'">
-    <None Update="$(MSBuildThisFileDirectory)..\arm64\leptonica-1.87.0.dll"
+    <None Update="$(MSBuildThisFileDirectory)..\arm64\leptonica-1.82.0.dll"
           Pack="true"
           PackagePath="tools/$(TargetFramework)/any/x64/" />
     <None Update="$(MSBuildThisFileDirectory)..\arm64\tesseract50.dll"
