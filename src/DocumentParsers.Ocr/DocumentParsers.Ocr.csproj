@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <AssemblyName>FieldCure.DocumentParsers.Ocr</AssemblyName>
     <RootNamespace>FieldCure.DocumentParsers.Ocr</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -28,7 +28,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      v1.0.0 — Initial release. Successor to the deprecated FieldCure.DocumentParsers.Pdf.Ocr. Provides `OcrPdfParser` (replaces the old `PdfParser(IOcrEngine)` overload), `TesseractOcrEngine` with English + Korean tessdata, and `DocumentParserFactoryOcrExtensions.AddOcrSupport()` / `AddOcrSupport(IOcrEngine)`. Namespace: `FieldCure.DocumentParsers.Ocr`. Depends on FieldCure.DocumentParsers.Imaging for page rendering. Windows only — assembly is marked `[SupportedOSPlatform("windows")]`. Linux / macOS support is planned for a future release.
+      v1.1.0 — Adds win-arm64 native binaries. ARM64 DLLs (tesseract50.dll, leptonica-1.82.0.dll) are built from Tesseract 5.5.2 + Leptonica 1.87.0 source via vcpkg with a slim overlay-port (libcurl + libarchive disabled), Authenticode-signed by Fieldcure Co., Ltd., and selected at build time by detecting host RID via $(NETCoreSdkRuntimeIdentifier) (with $(Platform)/$(RuntimeIdentifier)/$(PlatformTarget) override paths for explicit arch builds). The wrapper hardcodes "leptonica-1.82.0" + "tesseract50" filenames, so the ARM64 leptonica file is renamed to leptonica-1.82.0.dll and tesseract50.dll's PE import table is patched in-place to reference that name. The x64 path is unchanged (Tesseract 5.0 native, redistributed from upstream Tesseract NuGet 5.2.0). The Tesseract C ABI is additive across 5.0 -> 5.5, so the wrapper's DllImport surface is fully compatible. Build script: scripts/build-tesseract-arm64.ps1. CI verified on windows-11-arm runner.
     </PackageReleaseNotes>
   </PropertyGroup>
 

@@ -6,8 +6,8 @@ This package plugs into [FieldCure.DocumentParsers](https://www.nuget.org/packag
 by registering an `OcrPdfParser` for `.pdf` — when PdfPig yields no text layer
 for a page, the page is rendered at 300 DPI (via PDFium) and recognized with Tesseract.
 
-> **⚠ Platform: Windows only.**
-> The bundled Tesseract 5.2.0 package ships native Windows binaries (`leptonica-1.82.0.dll`, `tesseract50.dll`). The assembly is marked `[SupportedOSPlatform("windows")]` — cross-platform consumers will see a CA1416 warning at compile time. Linux / macOS support is planned for a future release.
+> **⚠ Platform: Windows only (x64 + arm64).**
+> Native Tesseract binaries are bundled for both architectures: `win-x64` ships Tesseract 5.0 / Leptonica 1.82.0 (redistributed from upstream [Tesseract](https://www.nuget.org/packages/Tesseract) 5.2.0), and `win-arm64` ships Tesseract 5.5.2 / Leptonica 1.87.0 built from source via vcpkg and Authenticode-signed by FieldCure. The correct-arch DLLs are selected at consumer build time. The assembly is marked `[SupportedOSPlatform("windows")]` — cross-platform consumers will see a CA1416 warning at compile time. Linux / macOS support is planned for a future release.
 >
 > If you only need text from PDFs with an embedded text layer, use the core [FieldCure.DocumentParsers](https://www.nuget.org/packages/FieldCure.DocumentParsers) package (pure managed, fully cross-platform).
 
@@ -57,6 +57,15 @@ Languages are auto-discovered from embedded traineddata files.
 ## Thread Safety
 
 `TesseractOcrEngine` uses an engine pool (default size: `min(ProcessorCount, 4)`).
+
+## Architecture support
+
+| RID | Tesseract native | Leptonica native | Source |
+|---|---|---|---|
+| `win-x64` | 5.0 (`tesseract50.dll`) | 1.82.0 (`leptonica-1.82.0.dll`) | redistributed from [Tesseract](https://www.nuget.org/packages/Tesseract) 5.2.0 NuGet |
+| `win-arm64` | 5.5.2 (`tesseract50.dll`) | 1.87.0 (`leptonica-1.82.0.dll`, filename only — internal version is 1.87.0) | built via vcpkg with a slim FieldCure overlay-port (libcurl + libarchive disabled), Authenticode-signed |
+
+The Tesseract C ABI is additive across 5.0 -> 5.5 (no symbol removals or signature changes), so the wrapper's `[DllImport]` surface is fully compatible. `build/FieldCure.DocumentParsers.Ocr.targets` selects the correct-arch DLL at consumer build time by detecting host RID via `$(NETCoreSdkRuntimeIdentifier)`, with `$(Platform)`, `$(RuntimeIdentifier)`, `$(PlatformTarget)` as override paths for explicit-arch cross builds.
 
 ## Related Packages
 

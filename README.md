@@ -26,12 +26,12 @@ with heading detection and table support — designed for LLM/RAG pipelines.
 |---------|-------------|:-----------:|
 | `FieldCure.DocumentParsers` | DOCX, HWPX, XLSX, PPTX, HTML, **PDF** (text) | — |
 | `FieldCure.DocumentParsers.Imaging` | PDF → page images (adds `IMediaDocumentParser`) | PDFium |
-| `FieldCure.DocumentParsers.Ocr` | Tesseract OCR fallback for scanned PDFs — **Windows only** | PDFium + Tesseract |
+| `FieldCure.DocumentParsers.Ocr` | Tesseract OCR fallback for scanned PDFs — **Windows (x64 + arm64)** | PDFium + Tesseract |
 | `FieldCure.DocumentParsers.Audio` | Audio → timestamped transcripts via Whisper.net — **Windows only** | Whisper.net + NAudio |
 
 The core package is pure managed — no native binaries are pulled in unless you opt into Imaging, Ocr, or Audio.
 
-> The Ocr package is currently **Windows only** — the bundled Tesseract 5.2.0 ships native Windows binaries only. The assembly carries `[SupportedOSPlatform("windows")]`, so non-Windows consumers will see CA1416 warnings at compile time. Cross-platform OCR is on the roadmap; in the meantime use the core package directly for PDFs that have an embedded text layer (works everywhere).
+> The Ocr package is currently **Windows only**, but ships natives for both `win-x64` (Tesseract 5.0 redistributed from the upstream NuGet) and `win-arm64` (Tesseract 5.5.2 built from source via vcpkg, Authenticode-signed by FieldCure). The assembly carries `[SupportedOSPlatform("windows")]`, so non-Windows consumers will see CA1416 warnings at compile time. Linux / macOS OCR is on the roadmap; in the meantime use the core package directly for PDFs that have an embedded text layer (works everywhere).
 
 > **Deprecated (v2.0):** `FieldCure.DocumentParsers.Pdf` (replaced by core + Imaging) and `FieldCure.DocumentParsers.Pdf.Ocr` (renamed to `.Ocr`).
 
@@ -271,7 +271,7 @@ src/
 │   ├── Html/                            HtmlParser
 │   └── Pdf/                             PdfParser (text via PdfPig)
 ├── DocumentParsers.Imaging/             FieldCure.DocumentParsers.Imaging 1.0 (net8.0 + net10.0)
-├── DocumentParsers.Ocr/                 FieldCure.DocumentParsers.Ocr 1.0 (net8.0 + net10.0)
+├── DocumentParsers.Ocr/                 FieldCure.DocumentParsers.Ocr 1.1 (net8.0 + net10.0)
 ├── DocumentParsers.Audio/               FieldCure.DocumentParsers.Audio 0.1 (net8.0 + net10.0)
 ├── DocumentParsers.Cli/                 Console tool for manual output inspection
 ├── DocumentParsers.Tests/               MSTest — core + PdfParser tests
